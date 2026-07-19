@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Uninstaller.Models"
+             x:Class="Uninstaller.Pages.MainPage">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Cabecera: contador, filtro de apps del sistema y seleccion -->
+        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="12,12,12,6">
+            <VerticalStackLayout Padding="16,14" Spacing="12">
+                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label x:Name="TitleLabel" Style="{StaticResource CardTitle}" />
+                        <Label x:Name="CountLabel" Style="{StaticResource HintText}" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1"
+                            x:Name="RefreshButton"
+                            Style="{StaticResource OutlineButton}"
+                            Clicked="OnRefreshClicked"
+                            WidthRequest="120" />
+                </Grid>
+
+                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                    <Label Grid.Column="0"
+                           x:Name="ShowSystemLabel"
+                           Style="{StaticResource BodyText}"
+                           VerticalOptions="Center" />
+                    <Switch Grid.Column="1"
+                            x:Name="ShowSystemSwitch"
+                            OnColor="{StaticResource Primary}"
+                            Toggled="OnShowSystemToggled" />
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button Grid.Column="0"
+                            x:Name="SelectAllButton"
+                            Style="{StaticResource OutlineButton}"
+                            Clicked="OnSelectAllClicked" />
+                    <Button Grid.Column="1"
+                            x:Name="ClearButton"
+                            Style="{StaticResource OutlineButton}"
+                            Clicked="OnClearClicked" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Lista de aplicaciones -->
+        <RefreshView Grid.Row="1" x:Name="ListRefresh" Refreshing="OnRefreshing">
+            <CollectionView x:Name="AppsList" SelectionMode="None" Margin="12,6,12,6">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:InstalledApp">
+                        <Border Style="{StaticResource Card}" Margin="0,4" Padding="0">
+                            <Grid ColumnDefinitions="Auto,*,Auto" Padding="12,10" ColumnSpacing="12">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnRowTapped" />
+                                </Grid.GestureRecognizers>
+
+                                <!-- Icono en circulo -->
+                                <Border Grid.Column="0"
+                                        WidthRequest="44" HeightRequest="44"
+                                        Padding="6"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource IconTileLight}, Dark={StaticResource IconTileDark}}"
+                                        StrokeThickness="0"
+                                        VerticalOptions="Center">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="10" />
+                                    </Border.StrokeShape>
+                                    <Image Source="{Binding Icon}" Aspect="AspectFit" />
+                                </Border>
+
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Label}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding PackageName}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                                </VerticalStackLayout>
+
+                                <CheckBox Grid.Column="2"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Color="{StaticResource Primary}"
+                                          VerticalOptions="Center"
+                                          CheckedChanged="OnItemCheckedChanged" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout Padding="30" Spacing="8" VerticalOptions="Center">
+                        <Label x:Name="EmptyLabel"
+                               Style="{StaticResource CardTitle}"
+                               HorizontalTextAlignment="Center"
+                               HorizontalOptions="Center" />
+                        <Label x:Name="EmptyHintLabel"
+                               Style="{StaticResource HintText}"
+                               HorizontalTextAlignment="Center"
+                               HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Overlay de carga -->
+        <Grid Grid.Row="1"
+              x:Name="LoadingOverlay"
+              IsVisible="False"
+              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+              Opacity="0.92">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" WidthRequest="42" HeightRequest="42" />
+                <Label x:Name="LoadingLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- Accion principal: desinstalar seleccionadas -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="12,6,12,12">
+            <Button x:Name="UninstallButton"
+                    Style="{StaticResource DangerButton}"
+                    Clicked="OnUninstallSelectedClicked"
+                    IsEnabled="False"
+                    Margin="8"
+                    HorizontalOptions="Fill" />
+        </Border>
+
+    </Grid>
+
+</ContentPage>

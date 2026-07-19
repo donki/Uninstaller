@@ -1,0 +1,15 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+.vs/
+
+# Firmas y secretos (constitucion 6): nunca al repositorio
+*.keystore
+*.jks
+keystore.password.txt
+
+# Logs (constitucion 10): no se versionan
+*.log
+
+# Usuario/entorno
+*.user

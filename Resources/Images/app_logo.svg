@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Logo para la cabecera del menu y la pagina Acerca de: insignia teal con papelera blanca,
+     legible sobre cualquier fondo (barra teal, tarjeta clara u oscura). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
+  <rect width="456" height="456" rx="96" fill="#00897B" />
+  <g fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 172 H306" />
+    <path d="M198 172 V158 a8 8 0 0 1 8 -8 h44 a8 8 0 0 1 8 8 V172" />
+    <path d="M172 186 l12 138 a12 12 0 0 0 12 11 h64 a12 12 0 0 0 12 -11 l12 -138" />
+    <path d="M206 208 V308" />
+    <path d="M228 208 V308" />
+    <path d="M250 208 V308" />
+  </g>
+</svg>

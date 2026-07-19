@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:pages="clr-namespace:Uninstaller.Pages"
+       x:Class="Uninstaller.AppShell"
+       FlyoutBehavior="Flyout"
+       FlyoutWidth="280"
+       FlyoutBackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+       BackgroundColor="{StaticResource Primary}">
+
+    <Shell.Resources>
+        <ResourceDictionary>
+            <Style x:Key="BaseStyle" TargetType="Element">
+                <Setter Property="Shell.BackgroundColor" Value="{StaticResource Primary}" />
+                <Setter Property="Shell.ForegroundColor" Value="{StaticResource OnPrimary}" />
+                <Setter Property="Shell.TitleColor" Value="{StaticResource OnPrimary}" />
+            </Style>
+        </ResourceDictionary>
+    </Shell.Resources>
+
+    <!-- Cabecera del menu hamburguesa (constitucion A.9) -->
+    <Shell.FlyoutHeader>
+        <Grid BackgroundColor="{StaticResource Primary}" HeightRequest="150" Padding="20,44,20,16">
+            <VerticalStackLayout VerticalOptions="End" Spacing="4">
+                <Image Source="app_logo.png" WidthRequest="52" HeightRequest="52" HorizontalOptions="Start" />
+                <Label Text="Uninstaller" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource OnPrimary}" />
+                <Label x:Name="HeaderSubtitle" FontSize="12" TextColor="{StaticResource OnPrimary}" Opacity="0.9" />
+            </VerticalStackLayout>
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <!-- Contenido del menu a medida: items con tokens de tema (constitucion A.9). -->
+    <Shell.FlyoutContent>
+        <ScrollView>
+            <VerticalStackLayout Padding="0,8" Spacing="0">
+
+                <!-- Inicio -->
+                <Grid ColumnDefinitions="26,*" Padding="20,0" HeightRequest="52" ColumnSpacing="16">
+                    <Image Grid.Column="0" Source="ic_home.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
+                    <Label Grid.Column="1" x:Name="HomeLabel" VerticalOptions="Center" FontSize="16"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnHomeTapped" /></Grid.GestureRecognizers>
+                </Grid>
+
+                <!-- Acerca de -->
+                <Grid ColumnDefinitions="26,*" Padding="20,0" HeightRequest="52" ColumnSpacing="16">
+                    <Image Grid.Column="0" Source="ic_info.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
+                    <Label Grid.Column="1" x:Name="AboutLabel" VerticalOptions="Center" FontSize="16"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnAboutTapped" /></Grid.GestureRecognizers>
+                </Grid>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Shell.FlyoutContent>
+
+    <!-- Estructura de navegacion (rutas). El menu visual lo pinta FlyoutContent. -->
+    <FlyoutItem Title="Inicio" Icon="ic_home.png">
+        <ShellContent ContentTemplate="{DataTemplate pages:MainPage}" Route="MainPage" />
+    </FlyoutItem>
+    <FlyoutItem Title="Acerca de" Icon="ic_info.png">
+        <ShellContent ContentTemplate="{DataTemplate pages:AboutPage}" Route="AboutPage" />
+    </FlyoutItem>
+
+</Shell>

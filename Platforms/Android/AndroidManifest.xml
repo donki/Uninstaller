@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <application android:allowBackup="true"
+               android:icon="@mipmap/appicon"
+               android:roundIcon="@mipmap/appicon_round"
+               android:supportsRtl="true" />
+
+  <!--
+    Permisos (constitucion 6 y A.3: justificar cada permiso, minimo privilegio).
+
+    QUERY_ALL_PACKAGES: la funcion principal de la aplicacion es LISTAR todas las apps instaladas
+    para que el usuario elija cuales desinstalar. Desde Android 11 (API 30) la visibilidad de otras
+    apps esta restringida y este es el unico permiso que permite enumerar el catalogo completo.
+    Google Play exige declarar su justificacion (uso de gestor/desinstalador de aplicaciones).
+
+    REQUEST_DELETE_PACKAGES: permite lanzar el flujo de desinstalacion del sistema (el usuario
+    confirma cada app). Es un permiso normal, concedido en la instalacion.
+
+    INTERNET: solo para la comprobacion de version al arrancar (constitucion 15), que consulta el
+    manifiesto del repositorio. No se usa para nada mas.
+  -->
+  <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+  <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <queries>
+    <!-- Boton de contacto de la pagina Acerca de. -->
+    <intent>
+      <action android:name="android.intent.action.SENDTO" />
+      <data android:scheme="mailto" />
+    </intent>
+  </queries>
+
+</manifest>
