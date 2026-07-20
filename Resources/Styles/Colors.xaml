@@ -7,7 +7,6 @@
     <!-- Marca -->
     <Color x:Key="Primary">#00897B</Color>
     <Color x:Key="PrimaryDark">#00695C</Color>
-    <Color x:Key="PrimaryLight">#4DB6AC</Color>
     <Color x:Key="Accent">#FB8C00</Color>
     <Color x:Key="Danger">#E74C3C</Color>
     <Color x:Key="Success">#27AE60</Color>
@@ -34,7 +33,6 @@
 
     <!-- Superficies semanticas derivadas (sin literales hex sueltos en el markup, constitucion 24) -->
     <!-- Subtitulo sobre la barra teal de la marca -->
-    <Color x:Key="SubtitleOnPrimary">#CFE9E5</Color>
     <!-- Fondo del circulo que envuelve el icono de cada app en la lista -->
     <Color x:Key="IconTileLight">#E7F1EF</Color>
     <Color x:Key="IconTileDark">#252D36</Color>
