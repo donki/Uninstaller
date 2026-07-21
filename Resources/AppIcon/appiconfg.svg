@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Icono de la aplicacion: papelera (tematica de desinstalacion), trazo blanco sobre el teal. -->
+<!-- Primer plano: papelera BLANCA SÓLIDA (tema de desinstalación) sobre el teal de
+     marca. Glifo grande y de alto contraste; ranuras en el teal del fondo. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
-  <g fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-    <!-- tapa -->
-    <path d="M150 172 H306" />
-    <!-- asa -->
-    <path d="M198 172 V158 a8 8 0 0 1 8 -8 h44 a8 8 0 0 1 8 8 V172" />
-    <!-- cuerpo -->
-    <path d="M172 186 l12 138 a12 12 0 0 0 12 11 h64 a12 12 0 0 0 12 -11 l12 -138" />
-    <!-- lineas interiores -->
-    <path d="M206 208 V308" />
-    <path d="M228 208 V308" />
-    <path d="M250 208 V308" />
+
+  <g fill="#FFFFFF">
+    <!-- Tapa -->
+    <rect x="138" y="158" width="180" height="28" rx="14" />
+    <!-- Asa -->
+    <path d="M192 158 v-14 a16 16 0 0 1 16 -16 h40 a16 16 0 0 1 16 16 v14 h-30 v-8 a4 4 0 0 0 -4 -4 h-20 a4 4 0 0 0 -4 4 v8 Z" />
+    <!-- Cuerpo (cubo) -->
+    <path d="M158 198 h140 l-15 148 a20 20 0 0 1 -20 18 H193 a20 20 0 0 1 -20 -18 Z" />
   </g>
+
+  <!-- Ranuras verticales (color del fondo teal, dan el detalle "vaciado") -->
+  <g fill="none" stroke="#00695C" stroke-width="14" stroke-linecap="round">
+    <path d="M198 226 l6 104" />
+    <path d="M228 226 v104" />
+    <path d="M258 226 l-6 104" />
+  </g>
+
 </svg>
