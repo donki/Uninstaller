@@ -24,7 +24,6 @@
             <VerticalStackLayout VerticalOptions="End" Spacing="4">
                 <Image Source="app_logo.png" WidthRequest="52" HeightRequest="52" HorizontalOptions="Start" />
                 <Label Text="Uninstaller" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource OnPrimary}" />
-                <Label x:Name="HeaderSubtitle" FontSize="12" TextColor="{StaticResource OnPrimary}" Opacity="0.9" />
             </VerticalStackLayout>
         </Grid>
     </Shell.FlyoutHeader>
@@ -53,6 +52,17 @@
             </VerticalStackLayout>
         </ScrollView>
     </Shell.FlyoutContent>
+
+    <!-- Pie del menu con la version -->
+    <Shell.FlyoutFooter>
+        <Grid Padding="20,12">
+            <Label Text="v2026.07.28.0"
+                   FontSize="12"
+                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                   VerticalOptions="Center"
+                   HorizontalOptions="Center" />
+        </Grid>
+    </Shell.FlyoutFooter>
 
     <!-- Estructura de navegacion (rutas). El menu visual lo pinta FlyoutContent. -->
     <FlyoutItem Title="Inicio" Icon="ic_home.png">

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Fondo del icono de launcher: teal de la marca. El dibujo va en appiconfg.svg. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
-  <rect width="456" height="456" fill="#00897B" />
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="456" y2="456" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#635BF2"/><stop offset="1" stop-color="#2A1CB8"/>
+  </linearGradient></defs>
+  <rect width="456" height="456" fill="url(#bg)"/>
 </svg>

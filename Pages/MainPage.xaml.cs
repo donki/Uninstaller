@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SocShared;
 using Uninstaller.Helpers;
 using Uninstaller.Models;
 using Uninstaller.Services;
@@ -85,7 +86,7 @@ public partial class MainPage : ContentPage
         catch (Exception ex)
         {
             _logger.LogError(ex, "Could not load the installed apps");
-            await DisplayAlert(_l["Error"], string.Format(_l.CurrentCulture, _l["ErrorLoad"], ex.Message), _l["Ok"]);
+            await ModernDialog.AlertAsync(this, _l["Error"], string.Format(_l.CurrentCulture, _l["ErrorLoad"], ex.Message), _l["Ok"]);
         }
         finally
         {
@@ -155,11 +156,12 @@ public partial class MainPage : ContentPage
         var selected = _apps.Where(a => a.IsSelected).ToList();
         if (selected.Count == 0)
         {
-            await DisplayAlert(_l["ConfirmUninstallTitle"], _l["NothingSelected"], _l["Ok"]);
+            await ModernDialog.AlertAsync(this, _l["ConfirmUninstallTitle"], _l["NothingSelected"], _l["Ok"]);
             return;
         }
 
-        var confirm = await DisplayAlert(
+        var confirm = await ModernDialog.AlertAsync(
+            this,
             _l["ConfirmUninstallTitle"],
             string.Format(_l.CurrentCulture, _l["ConfirmUninstallMany"], selected.Count),
             _l["Continue"], _l["Cancel"]);
@@ -179,7 +181,8 @@ public partial class MainPage : ContentPage
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Could not uninstall {Package}", app.PackageName);
-                await DisplayAlert(
+                await ModernDialog.AlertAsync(
+                    this,
                     _l["Error"],
                     string.Format(_l.CurrentCulture, _l["ErrorUninstall"], app.Label, ex.Message),
                     _l["Ok"]);
