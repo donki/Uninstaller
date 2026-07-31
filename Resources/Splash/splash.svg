@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Pantalla de inicio: la papelera en blanco sobre el teal de la marca (color del MauiSplashScreen). -->
-<svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
-  <g fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M150 172 H306" />
-    <path d="M198 172 V158 a8 8 0 0 1 8 -8 h44 a8 8 0 0 1 8 8 V172" />
-    <path d="M172 186 l12 138 a12 12 0 0 0 12 11 h64 a12 12 0 0 0 12 -11 l12 -138" />
-    <path d="M206 208 V308" />
-    <path d="M228 208 V308" />
-    <path d="M250 208 V308" />
-  </g>
+<!-- Splash: papelera blanca centrada sobre fondo indigo (#3525CD). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="214" y="132" width="84" height="22" rx="11" fill="#C3C0FF"/>
+  <rect x="150" y="158" width="212" height="30" rx="15" fill="#FFFFFF"/>
+  <path fill="#FFFFFF" d="M172 200 h168 l-16 176 a26 26 0 0 1 -26 24 H214 a26 26 0 0 1 -26 -24 Z"/>
+  <rect x="212" y="232" width="16" height="120" rx="8" fill="#3525CD"/>
+  <rect x="248" y="232" width="16" height="120" rx="8" fill="#3525CD"/>
+  <rect x="284" y="232" width="16" height="120" rx="8" fill="#3525CD"/>
 </svg>

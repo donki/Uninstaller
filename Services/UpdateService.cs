@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SocShared;
 
 namespace Uninstaller.Services;
 
@@ -36,7 +37,8 @@ public class UpdateService
             if (CompareVersions(manifest.Version, current) <= 0)
                 return; // ya se esta en la ultima version (o mas nueva)
 
-            var wantsUpdate = await page.DisplayAlert(
+            var wantsUpdate = await ModernDialog.AlertAsync(
+                page,
                 _l["UpdateTitle"],
                 string.Format(_l.CurrentCulture, _l["UpdateBody"], manifest.Version, current),
                 _l["UpdateNow"], _l["UpdateLater"]);

@@ -18,7 +18,6 @@ public partial class AppShell : Shell
 
     private void ApplyTexts()
     {
-        HeaderSubtitle.Text = _l["AppDescription"];
         HomeLabel.Text = _l["MenuHome"];
         AboutLabel.Text = _l["About"];
 

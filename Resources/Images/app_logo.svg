@@ -2,7 +2,7 @@
 <!-- Logo para la cabecera del menu y la pagina Acerca de: insignia teal con papelera blanca,
      legible sobre cualquier fondo (barra teal, tarjeta clara u oscura). -->
 <svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
-  <rect width="456" height="456" rx="96" fill="#00897B" />
+  <rect width="456" height="456" rx="96" fill="#3525CD" />
   <g fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
     <path d="M150 172 H306" />
     <path d="M198 172 V158 a8 8 0 0 1 8 -8 h44 a8 8 0 0 1 8 8 V172" />

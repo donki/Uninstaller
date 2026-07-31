@@ -1,22 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Primer plano: papelera BLANCA SÓLIDA (tema de desinstalación) sobre el teal de
-     marca. Glifo grande y de alto contraste; ranuras en el teal del fondo. -->
+<!-- Primer plano: papelera moderna (símbolo claro de desinstalar) con tapa en coral para
+     señalar "quitar". Cuerpo blanco con degradado y líneas en el teal de marca. Sombra suave.
+     Dentro de la zona segura del icono adaptativo. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
+  <defs>
+    <linearGradient id="can" x1="0" y1="178" x2="0" y2="336" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#EDECFB" />
+    </linearGradient>
+  </defs>
 
-  <g fill="#FFFFFF">
-    <!-- Tapa -->
-    <rect x="138" y="158" width="180" height="28" rx="14" />
-    <!-- Asa -->
-    <path d="M192 158 v-14 a16 16 0 0 1 16 -16 h40 a16 16 0 0 1 16 16 v14 h-30 v-8 a4 4 0 0 0 -4 -4 h-20 a4 4 0 0 0 -4 4 v8 Z" />
-    <!-- Cuerpo (cubo) -->
-    <path d="M158 198 h140 l-15 148 a20 20 0 0 1 -20 18 H193 a20 20 0 0 1 -20 -18 Z" />
-  </g>
+  <!-- Sombra suave bajo la papelera -->
+  <ellipse cx="228" cy="342" rx="92" ry="20" fill="#1A1240" opacity="0.20" />
 
-  <!-- Ranuras verticales (color del fondo teal, dan el detalle "vaciado") -->
-  <g fill="none" stroke="#00695C" stroke-width="14" stroke-linecap="round">
-    <path d="M198 226 l6 104" />
-    <path d="M228 226 v104" />
-    <path d="M258 226 l-6 104" />
-  </g>
+  <!-- Asa de la tapa -->
+  <rect x="205" y="124" width="46" height="16" rx="8" fill="#C3C0FF" />
+  <!-- Tapa -->
+  <rect x="148" y="144" width="160" height="26" rx="13" fill="#C3C0FF" />
+  <!-- Brillo en la tapa -->
+  <rect x="160" y="149" width="80" height="6" rx="3" fill="#FFFFFF" opacity="0.35" />
 
+  <!-- Cuerpo de la papelera -->
+  <path d="M164 180 H292 L280 322 a18 18 0 0 1 -18 14 H194 a18 18 0 0 1 -18 -14 Z" fill="url(#can)" />
+
+  <!-- Líneas de "borrar" en el color de marca -->
+  <rect x="196" y="204" width="12" height="104" rx="6" fill="#3525CD" opacity="0.85" />
+  <rect x="222" y="204" width="12" height="104" rx="6" fill="#3525CD" opacity="0.85" />
+  <rect x="248" y="204" width="12" height="104" rx="6" fill="#3525CD" opacity="0.85" />
 </svg>
