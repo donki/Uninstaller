@@ -14,6 +14,12 @@ public class InstalledApp : INotifyPropertyChanged
 
     public bool IsSystem { get; init; }
 
+    /// <summary>Fecha de primera instalacion (PackageInfo.FirstInstallTime).</summary>
+    public DateTime InstallDate { get; init; }
+
+    /// <summary>Fecha de la ultima actualizacion (PackageInfo.LastUpdateTime).</summary>
+    public DateTime UpdatedDate { get; init; }
+
     /// <summary>Icono de la app, ya convertido a un origen de imagen de MAUI.</summary>
     public ImageSource? Icon { get; init; }
 

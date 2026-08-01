@@ -35,9 +35,14 @@ public class AppInventoryService : IAppInventoryService
 
             var result = new List<InstalledApp>();
 
-            foreach (var ai in pm.GetInstalledApplications(PackageInfoFlags.MetaData))
+            // GetInstalledPackages (no GetInstalledApplications) para tener FirstInstallTime/LastUpdateTime.
+            foreach (var pi in pm.GetInstalledPackages(PackageInfoFlags.MetaData))
             {
-                var package = ai.PackageName;
+                var ai = pi.ApplicationInfo;
+                if (ai is null)
+                    continue;
+
+                var package = pi.PackageName ?? ai.PackageName;
                 if (string.IsNullOrEmpty(package) || package == ownPackage)
                     continue;
 
@@ -60,11 +65,14 @@ public class AppInventoryService : IAppInventoryService
                     PackageName = package,
                     Label = label,
                     IsSystem = isSystem,
+                    InstallDate = FromMillis(pi.FirstInstallTime),
+                    UpdatedDate = FromMillis(pi.LastUpdateTime),
                     Icon = icon
                 });
             }
 
-            result.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.CurrentCultureIgnoreCase));
+            // Orden por defecto: fecha de instalacion (mas reciente primero). La UI puede reordenar.
+            result.Sort((a, b) => b.InstallDate.CompareTo(a.InstallDate));
             return result;
         });
     }
@@ -99,6 +107,14 @@ public class AppInventoryService : IAppInventoryService
         _pendingUninstall = null;
         // Con EXTRA_RETURN_RESULT, RESULT_OK significa desinstalada.
         tcs?.TrySetResult(resultCode == Result.Ok);
+    }
+
+    private static DateTime FromMillis(long millis)
+    {
+        if (millis <= 0)
+            return DateTime.MinValue;
+        try { return DateTimeOffset.FromUnixTimeMilliseconds(millis).LocalDateTime; }
+        catch { return DateTime.MinValue; }
     }
 
     private static ImageSource? ToImageSource(Drawable? drawable)
