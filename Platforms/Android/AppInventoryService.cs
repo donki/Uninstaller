@@ -67,6 +67,7 @@ public class AppInventoryService : IAppInventoryService
                     IsSystem = isSystem,
                     InstallDate = FromMillis(pi.FirstInstallTime),
                     UpdatedDate = FromMillis(pi.LastUpdateTime),
+                    SizeBytes = GetApkSize(ai),
                     Icon = icon
                 });
             }
@@ -107,6 +108,39 @@ public class AppInventoryService : IAppInventoryService
         _pendingUninstall = null;
         // Con EXTRA_RETURN_RESULT, RESULT_OK significa desinstalada.
         tcs?.TrySetResult(resultCode == Result.Ok);
+    }
+
+    /// <summary>
+    /// Tamano de los APK instalados: el base mas los splits que genera un App Bundle. Es el dato
+    /// que se puede leer sin permisos; el tamano total con datos y cache exigiria
+    /// PACKAGE_USAGE_STATS, un permiso que el usuario tendria que conceder a mano y que esta app
+    /// no necesita para nada mas (constitucion 3: solo los permisos imprescindibles).
+    /// </summary>
+    private static long GetApkSize(ApplicationInfo ai)
+    {
+        long total = 0;
+        try
+        {
+            var baseApk = ai.PublicSourceDir ?? ai.SourceDir;
+            if (!string.IsNullOrEmpty(baseApk) && File.Exists(baseApk))
+                total += new FileInfo(baseApk).Length;
+
+            var splits = ai.SplitPublicSourceDirs ?? ai.SplitSourceDirs;
+            if (splits is not null)
+            {
+                foreach (var split in splits)
+                {
+                    if (!string.IsNullOrEmpty(split) && File.Exists(split))
+                        total += new FileInfo(split).Length;
+                }
+            }
+        }
+        catch
+        {
+            // Alguna app del sistema no deja leer su APK: se muestra sin tamano en vez de fallar.
+        }
+
+        return total;
     }
 
     private static DateTime FromMillis(long millis)

@@ -109,6 +109,18 @@ public class LocalizationService : ILocalizationService
         ["EmptyListHint"] = "Pull to refresh or enable “Show system apps”.",
         ["UninstallSelected"] = "Uninstall selected",
 
+        // Ordenacion
+        ["SortBy"] = "Sort by",
+        ["SortInstall"] = "Install date",
+        ["SortName"] = "Name (A–Z)",
+        ["SortUpdated"] = "Last updated",
+        ["SortSize"] = "Size",
+        ["SortedBy"] = "by {0}",
+
+        // Detalle de cada fila: {0} instalacion, {1} actualizacion, {2} tamano
+        ["AppDetails"] = "Inst. {0} · Upd. {1} · {2}",
+        ["AppDetailsNoUpdate"] = "Inst. {0} · {1}",
+
         // Desinstalacion
         ["NothingSelected"] = "Select at least one app first.",
         ["ConfirmUninstallTitle"] = "Uninstall apps",
@@ -183,6 +195,18 @@ public class LocalizationService : ILocalizationService
         ["EmptyList"] = "No hay aplicaciones para mostrar",
         ["EmptyListHint"] = "Desliza para actualizar o activa «Mostrar apps del sistema».",
         ["UninstallSelected"] = "Desinstalar seleccionadas",
+
+        // Ordenacion
+        ["SortBy"] = "Ordenar por",
+        ["SortInstall"] = "Fecha de instalación",
+        ["SortName"] = "Nombre (A–Z)",
+        ["SortUpdated"] = "Última actualización",
+        ["SortSize"] = "Tamaño",
+        ["SortedBy"] = "por {0}",
+
+        // Detalle de cada fila: {0} instalacion, {1} actualizacion, {2} tamano
+        ["AppDetails"] = "Inst. {0} · Act. {1} · {2}",
+        ["AppDetailsNoUpdate"] = "Inst. {0} · {1}",
 
         // Desinstalacion
         ["NothingSelected"] = "Selecciona al menos una aplicación.",

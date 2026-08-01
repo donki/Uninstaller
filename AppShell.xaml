@@ -56,7 +56,8 @@
     <!-- Pie del menu con la version -->
     <Shell.FlyoutFooter>
         <Grid Padding="20,12">
-            <Label Text="v2026.07.28.0"
+            <!-- La version se toma de AppInfo en el code-behind: escrita a mano se quedaba vieja. -->
+            <Label x:Name="VersionLabel"
                    FontSize="12"
                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                    VerticalOptions="Center"

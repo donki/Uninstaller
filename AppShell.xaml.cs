@@ -20,6 +20,7 @@ public partial class AppShell : Shell
     {
         HomeLabel.Text = _l["MenuHome"];
         AboutLabel.Text = _l["About"];
+        VersionLabel.Text = $"v{AppInfo.Current.VersionString}";
 
         // Los titulos de las rutas del Shell tambien se localizan (constitucion 8).
         foreach (var item in Items)

@@ -17,8 +17,8 @@
     <ApplicationId>com.socratic.uninstaller</ApplicationId>
 
     <!-- Versions (constitucion 11 / A.4: ambos valores en sincronia) -->
-    <ApplicationDisplayVersion>2026.07.31.0</ApplicationDisplayVersion>
-    <ApplicationVersion>202607310</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.08.01.0</ApplicationDisplayVersion>
+    <ApplicationVersion>202608010</ApplicationVersion>
 
     <!-- Accept Android SDK Licenses -->
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
