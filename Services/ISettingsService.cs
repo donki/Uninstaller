@@ -10,4 +10,7 @@ public interface ISettingsService
 
     /// <summary>Si se muestran tambien las apps del sistema, ademas de las del usuario.</summary>
     bool ShowSystemApps { get; set; }
+
+    /// <summary>Criterio de orden de la lista: "install" (defecto), "name" o "updated".</summary>
+    string SortMode { get; set; }
 }

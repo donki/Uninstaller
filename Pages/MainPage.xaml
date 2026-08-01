@@ -9,12 +9,18 @@
         <!-- Cabecera: contador, filtro de apps del sistema y seleccion -->
         <Border Grid.Row="0" Style="{StaticResource Card}" Margin="12,12,12,6">
             <VerticalStackLayout Padding="16,14" Spacing="12">
-                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
                         <Label x:Name="TitleLabel" Style="{StaticResource CardTitle}" />
                         <Label x:Name="CountLabel" Style="{StaticResource HintText}" />
                     </VerticalStackLayout>
                     <Button Grid.Column="1"
+                            x:Name="SortButton"
+                            Style="{StaticResource OutlineButton}"
+                            ImageSource="sort.svg"
+                            Clicked="OnSortClicked"
+                            WidthRequest="52" />
+                    <Button Grid.Column="2"
                             x:Name="RefreshButton"
                             Style="{StaticResource OutlineButton}"
                             Clicked="OnRefreshClicked"

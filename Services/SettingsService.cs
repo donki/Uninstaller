@@ -5,6 +5,7 @@ public class SettingsService : ISettingsService
 {
     private const string LanguageKey = "language";
     private const string ShowSystemKey = "show_system_apps";
+    private const string SortKey = "sort_mode";
 
     public string Language
     {
@@ -16,5 +17,11 @@ public class SettingsService : ISettingsService
     {
         get => Preferences.Get(ShowSystemKey, false);
         set => Preferences.Set(ShowSystemKey, value);
+    }
+
+    public string SortMode
+    {
+        get => Preferences.Get(SortKey, "install");
+        set => Preferences.Set(SortKey, value ?? "install");
     }
 }

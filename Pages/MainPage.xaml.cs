@@ -80,7 +80,7 @@ public partial class MainPage : ContentPage
         {
             var apps = await _inventory.GetInstalledAppsAsync(_settings.ShowSystemApps);
             _apps = apps.ToList();
-            AppsList.ItemsSource = _apps;
+            ApplySort();
             UpdateCounts();
         }
         catch (Exception ex)
@@ -94,6 +94,38 @@ public partial class MainPage : ContentPage
             ListRefresh.IsRefreshing = false;
             _isBusy = false;
         }
+    }
+
+    private bool IsSpanish() => _l.CurrentCulture.TwoLetterISOLanguageName.Equals("es", StringComparison.OrdinalIgnoreCase);
+
+    // Ordena la lista segun el criterio guardado y refresca el binding.
+    private void ApplySort()
+    {
+        IEnumerable<InstalledApp> sorted = _settings.SortMode switch
+        {
+            "name"    => _apps.OrderBy(a => a.Label, StringComparer.CurrentCultureIgnoreCase),
+            "updated" => _apps.OrderByDescending(a => a.UpdatedDate),
+            _         => _apps.OrderByDescending(a => a.InstallDate), // "install" (defecto)
+        };
+        _apps = sorted.ToList();
+        AppsList.ItemsSource = _apps;
+    }
+
+    private async void OnSortClicked(object? sender, EventArgs e)
+    {
+        bool es = IsSpanish();
+        string byInstall = es ? "Fecha de instalación" : "Install date";
+        string byName    = es ? "Nombre (A–Z)"         : "Name (A–Z)";
+        string byUpdated = es ? "Última actualización"  : "Last updated";
+        string cancel    = es ? "Cancelar"              : "Cancel";
+        string title     = es ? "Ordenar por"           : "Sort by";
+
+        string? choice = await ModernDialog.ActionSheetAsync(this, title, cancel, byInstall, byName, byUpdated);
+        if (string.IsNullOrEmpty(choice) || choice == cancel)
+            return;
+
+        _settings.SortMode = choice == byName ? "name" : choice == byUpdated ? "updated" : "install";
+        ApplySort();
     }
 
     private void UpdateCounts()
