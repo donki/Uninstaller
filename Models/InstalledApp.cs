@@ -20,8 +20,29 @@ public class InstalledApp : INotifyPropertyChanged
     /// <summary>Fecha de la ultima actualizacion (PackageInfo.LastUpdateTime).</summary>
     public DateTime UpdatedDate { get; init; }
 
+    /// <summary>Tamano en disco de los APK de la app: el base mas los splits del App Bundle.</summary>
+    public long SizeBytes { get; init; }
+
     /// <summary>Icono de la app, ya convertido a un origen de imagen de MAUI.</summary>
     public ImageSource? Icon { get; init; }
+
+    private string _details = string.Empty;
+
+    /// <summary>
+    /// Linea de detalle de la fila (fechas y tamano) ya formateada y traducida. La compone la
+    /// pagina: el modelo no sabe de idiomas ni de formatos (constitucion 5).
+    /// </summary>
+    public string Details
+    {
+        get => _details;
+        set
+        {
+            if (_details == value)
+                return;
+            _details = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Details)));
+        }
+    }
 
     private bool _isSelected;
 

@@ -10,7 +10,12 @@
         <Border Grid.Row="0" Style="{StaticResource Card}" Margin="12,12,12,6">
             <VerticalStackLayout Padding="16,14" Spacing="12">
                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
+                    <!-- El contador muestra tambien el criterio de orden y abre el selector al
+                         pulsarlo, ademas del boton de la derecha. -->
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <VerticalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnSortClicked" />
+                        </VerticalStackLayout.GestureRecognizers>
                         <Label x:Name="TitleLabel" Style="{StaticResource CardTitle}" />
                         <Label x:Name="CountLabel" Style="{StaticResource HintText}" />
                     </VerticalStackLayout>
@@ -78,6 +83,9 @@
                                 <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
                                     <Label Text="{Binding Label}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
                                     <Label Text="{Binding PackageName}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                                    <!-- Fecha de instalacion, ultima actualizacion y tamano: son los
+                                         criterios por los que se puede ordenar, asi que se ven en la fila. -->
+                                    <Label Text="{Binding Details}" Style="{StaticResource HintText}" LineBreakMode="TailTruncation" />
                                 </VerticalStackLayout>
 
                                 <CheckBox Grid.Column="2"
