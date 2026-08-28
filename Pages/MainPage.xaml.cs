@@ -17,6 +17,11 @@ public partial class MainPage : ContentPage
     private readonly ILogger<MainPage> _logger;
 
     private List<InstalledApp> _apps = new();
+
+    /// <summary>Lo que se esta viendo: <see cref="_apps"/> pasado por el buscador.</summary>
+    private List<InstalledApp> _visible = new();
+
+    private string _search = string.Empty;
     private bool _isBusy;
     private bool _loadedOnce;
     private bool _suppressToggle;
@@ -63,6 +68,7 @@ public partial class MainPage : ContentPage
         ShowSystemLabel.Text = _l["ShowSystemApps"];
         SelectAllButton.Text = _l["SelectAll"];
         ClearButton.Text = _l["DeselectAll"];
+        SearchEntry.Placeholder = _l["SearchPlaceholder"];
         EmptyLabel.Text = _l["EmptyList"];
         EmptyHintLabel.Text = _l["EmptyListHint"];
         LoadingLabel.Text = _l["Loading"];
@@ -122,7 +128,31 @@ public partial class MainPage : ContentPage
             _         => _apps.OrderByDescending(a => a.InstallDate), // "install" (defecto)
         };
         _apps = sorted.ToList();
-        AppsList.ItemsSource = _apps;
+        ApplyFilter();
+    }
+
+    /// <summary>
+    /// Deja en la lista solo lo que casa con lo escrito, por nombre visible o por paquete: quien
+    /// busca «whatsapp» y quien busca «com.whatsapp» quieren lo mismo.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        var term = _search.Trim();
+
+        _visible = term.Length == 0
+            ? _apps
+            : _apps.Where(app =>
+                app.Label.Contains(term, StringComparison.CurrentCultureIgnoreCase) ||
+                app.PackageName.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
+
+        AppsList.ItemsSource = _visible;
+    }
+
+    private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        _search = e.NewTextValue ?? string.Empty;
+        ApplyFilter();
+        UpdateCounts();
     }
 
     // Compone la linea de detalle de cada fila: fecha de instalacion, ultima actualizacion y
@@ -193,7 +223,9 @@ public partial class MainPage : ContentPage
 
     private void UpdateCounts()
     {
-        var total = _apps.Count;
+        // El contador habla de lo que se ve; el de seleccionadas, de todas, porque se desinstalan
+        // todas las marcadas aunque el buscador las haya dejado fuera de la vista.
+        var total = _visible.Count;
         var selected = _apps.Count(a => a.IsSelected);
 
         var totalText = total == 1
@@ -225,7 +257,8 @@ public partial class MainPage : ContentPage
 
     private void OnSelectAllClicked(object? sender, EventArgs e)
     {
-        foreach (var app in _apps)
+        // Solo lo que se esta viendo: marcar de golpe lo que el buscador esconde seria una trampa.
+        foreach (var app in _visible)
             app.IsSelected = true;
         UpdateCounts();
     }

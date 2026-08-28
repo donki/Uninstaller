@@ -32,6 +32,18 @@
                             WidthRequest="120" />
                 </Grid>
 
+                <!-- Buscador: con cien aplicaciones instaladas, desplazarse hasta la que se
+                     busca no es razonable (nota de autor del 2026-08-25). -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4" VerticalOptions="Center">
+                    <Image Grid.Column="0" Source="ic_search.png" WidthRequest="20" HeightRequest="20" Margin="4,0" />
+                    <!-- El aspa de borrar la pone el propio Entry; no hace falta otra al lado. -->
+                    <Entry Grid.Column="1"
+                           x:Name="SearchEntry"
+                           ReturnType="Search"
+                           ClearButtonVisibility="WhileEditing"
+                           TextChanged="OnSearchTextChanged" />
+                </Grid>
+
                 <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
                     <Label Grid.Column="0"
                            x:Name="ShowSystemLabel"
