@@ -2,6 +2,16 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.N` (constitucion 11).
 
+## 2026.08.28.1
+
+`versionCode`: 202608281
+
+- **Buscador** en la cabecera: filtra por nombre visible y por nombre de paquete, para no tener
+  que recorrer un centenar de aplicaciones hasta dar con la que se busca (nota de autor del
+  2026-08-25). El contador refleja lo que queda a la vista, y *Seleccionar todo* marca solo lo
+  filtrado: marcar de golpe lo que el buscador esconde seria una trampa. El contador de
+  seleccionadas sigue siendo el total, porque al desinstalar se desinstalan todas las marcadas.
+
 ## 2026.08.01.0
 
 `versionCode`: 202608010
