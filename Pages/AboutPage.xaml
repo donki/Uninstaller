@@ -52,24 +52,6 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Apoyo (Ko-fi) — oculto a petición del autor en todas las apps. -->
-            <Border Style="{StaticResource Card}" IsVisible="False">
-                <VerticalStackLayout Padding="25,20" Spacing="12">
-                    <Label x:Name="DonationTitle"
-                           Style="{StaticResource CardTitle}"
-                           TextColor="{StaticResource Accent}" />
-
-                    <Button x:Name="DonationButton"
-                            Style="{StaticResource AccentButton}"
-                            Clicked="OnDonationClicked"
-                            HorizontalOptions="Fill" />
-
-                    <Label x:Name="DonationHint"
-                           Style="{StaticResource HintText}"
-                           HorizontalTextAlignment="Center" />
-                </VerticalStackLayout>
-            </Border>
-
             <!-- Idioma -->
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Padding="25,20" Spacing="12">

@@ -9,7 +9,6 @@ public partial class AboutPage : ContentPage
 {
     // CONFIGURACION (constantes idénticas en todos los proyectos, constitucion A.9)
     private const string ContactEmail = "jsoladelarosa@gmail.com";
-    private const string DonationUrl = "https://ko-fi.com/josepsola";
 
     private readonly ILocalizationService _l;
     private readonly ISettingsService _settings;
@@ -43,9 +42,6 @@ public partial class AboutPage : ContentPage
         ContactButton.Text = ContactEmail;
         ContactHint.Text = _l["AboutContactHint"];
 
-        DonationTitle.Text = $"☕ {_l["AboutDonation"]}";
-        DonationButton.Text = _l["AboutDonationButton"];
-        DonationHint.Text = _l["AboutDonationHint"];
 
         LanguageTitle.Text = $"🌐 {_l["SettingsLanguage"]}";
         LanguageHint.Text = _l["AboutLanguageHint"];
@@ -116,33 +112,4 @@ public partial class AboutPage : ContentPage
         }
     }
 
-    private async void OnDonationClicked(object? sender, EventArgs e)
-    {
-        try
-        {
-            await Browser.Default.OpenAsync(new Uri(DonationUrl), new BrowserLaunchOptions
-            {
-                LaunchMode = BrowserLaunchMode.SystemPreferred,
-                TitleMode = BrowserTitleMode.Show,
-                PreferredToolbarColor = Color.FromArgb("#4F46E5"),
-                PreferredControlColor = Colors.White
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not open the browser, falling back to the clipboard");
-
-            // Sin navegador el enlace se copia, para que el usuario pueda abrirlo donde quiera.
-            try
-            {
-                await Clipboard.Default.SetTextAsync(DonationUrl);
-                await ModernDialog.AlertAsync(this, _l["BrowserNotAvailable"], $"{_l["LinkCopied"]}:\n{DonationUrl}", _l["Ok"]);
-            }
-            catch (Exception clipboardEx)
-            {
-                _logger.LogError(clipboardEx, "The clipboard is not available either");
-                await ModernDialog.AlertAsync(this, _l["Error"], $"{_l["ErrorBrowser"]}: {DonationUrl}", _l["Ok"]);
-            }
-        }
-    }
 }
