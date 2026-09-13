@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:models="clr-namespace:Uninstaller.Models"
@@ -6,64 +6,66 @@
 
     <Grid RowDefinitions="Auto,*,Auto">
 
-        <!-- Cabecera: contador, filtro de apps del sistema y seleccion -->
+        <!-- Cabecera en dos lineas: contador con el criterio de orden, y una fila de botones de
+             icono. Antes ocupaba cuatro bloques (titulo, buscador, conmutador y dos botones con
+             texto) y se comia media pantalla que es para la lista (nota de autor del 2026-09-13).
+             El buscador solo aparece al pulsar la lupa. -->
         <Border Grid.Row="0" Style="{StaticResource Card}" Margin="12,12,12,6">
-            <VerticalStackLayout Padding="16,14" Spacing="12">
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" VerticalOptions="Center">
-                    <!-- El contador muestra tambien el criterio de orden y abre el selector al
-                         pulsarlo, ademas del boton de la derecha. -->
-                    <VerticalStackLayout Grid.Column="0" Spacing="2">
-                        <VerticalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnSortClicked" />
-                        </VerticalStackLayout.GestureRecognizers>
-                        <Label x:Name="TitleLabel" Style="{StaticResource CardTitle}" />
-                        <Label x:Name="CountLabel" Style="{StaticResource HintText}" />
-                    </VerticalStackLayout>
-                    <Button Grid.Column="1"
+            <VerticalStackLayout Padding="16,12" Spacing="10">
+                <!-- El contador muestra tambien el criterio de orden y abre el selector al
+                     pulsarlo, ademas del boton de ordenar. -->
+                <Label x:Name="CountLabel"
+                       Style="{StaticResource CardTitle}"
+                       FontSize="16"
+                       LineBreakMode="TailTruncation">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSortClicked" />
+                    </Label.GestureRecognizers>
+                </Label>
+
+                <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="6">
+                    <Button Grid.Column="0"
                             x:Name="SortButton"
-                            Style="{StaticResource OutlineButton}"
-                            ImageSource="sort.svg"
-                            Clicked="OnSortClicked"
-                            WidthRequest="52" />
-                    <Button Grid.Column="2"
+                            Style="{StaticResource IconButton}"
+                            ImageSource="sort.png"
+                            Clicked="OnSortClicked" />
+                    <Button Grid.Column="1"
                             x:Name="RefreshButton"
-                            Style="{StaticResource OutlineButton}"
-                            Clicked="OnRefreshClicked"
-                            WidthRequest="120" />
+                            Style="{StaticResource IconButton}"
+                            ImageSource="ic_refresh.png"
+                            Clicked="OnRefreshClicked" />
+                    <Button Grid.Column="2"
+                            x:Name="SearchButton"
+                            Style="{StaticResource IconButton}"
+                            ImageSource="ic_search.png"
+                            Clicked="OnSearchClicked" />
+                    <Button Grid.Column="3"
+                            x:Name="SelectAllButton"
+                            Style="{StaticResource IconButton}"
+                            ImageSource="ic_select_all.png"
+                            Clicked="OnSelectAllClicked" />
+                    <Button Grid.Column="4"
+                            x:Name="ClearButton"
+                            Style="{StaticResource IconButton}"
+                            ImageSource="ic_clear_selection.png"
+                            Clicked="OnClearClicked" />
+                    <!-- Conmutador de apps del sistema: relleno cuando esta activo. -->
+                    <Button Grid.Column="5"
+                            x:Name="ShowSystemButton"
+                            Style="{StaticResource IconButton}"
+                            ImageSource="ic_system.png"
+                            Clicked="OnShowSystemClicked" />
                 </Grid>
 
                 <!-- Buscador: con cien aplicaciones instaladas, desplazarse hasta la que se
-                     busca no es razonable (nota de autor del 2026-08-25). -->
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4" VerticalOptions="Center">
-                    <Image Grid.Column="0" Source="ic_search.png" WidthRequest="20" HeightRequest="20" Margin="4,0" />
+                     busca no es razonable (nota de autor del 2026-08-25). Oculto hasta que se
+                     pulsa la lupa; al cerrarlo se vacia el filtro. -->
+                <Grid x:Name="SearchRow" IsVisible="False" VerticalOptions="Center">
                     <!-- El aspa de borrar la pone el propio Entry; no hace falta otra al lado. -->
-                    <Entry Grid.Column="1"
-                           x:Name="SearchEntry"
+                    <Entry x:Name="SearchEntry"
                            ReturnType="Search"
                            ClearButtonVisibility="WhileEditing"
                            TextChanged="OnSearchTextChanged" />
-                </Grid>
-
-                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
-                    <Label Grid.Column="0"
-                           x:Name="ShowSystemLabel"
-                           Style="{StaticResource BodyText}"
-                           VerticalOptions="Center" />
-                    <Switch Grid.Column="1"
-                            x:Name="ShowSystemSwitch"
-                            OnColor="{StaticResource Primary}"
-                            Toggled="OnShowSystemToggled" />
-                </Grid>
-
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                    <Button Grid.Column="0"
-                            x:Name="SelectAllButton"
-                            Style="{StaticResource OutlineButton}"
-                            Clicked="OnSelectAllClicked" />
-                    <Button Grid.Column="1"
-                            x:Name="ClearButton"
-                            Style="{StaticResource OutlineButton}"
-                            Clicked="OnClearClicked" />
                 </Grid>
             </VerticalStackLayout>
         </Border>

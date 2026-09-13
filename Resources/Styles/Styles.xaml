@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
@@ -97,6 +97,14 @@
         <Setter Property="FontSize" Value="14" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="HeightRequest" Value="48" />
+    </Style>
+
+    <!-- Botones de la cabecera de la lista: solo icono, todos del mismo ancho (constitucion:
+         iconos en vez de palabras). -->
+    <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource OutlineButton}">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HeightRequest" Value="44" />
+        <Setter Property="MinimumWidthRequest" Value="44" />
     </Style>
 
     <Style x:Key="AccentButton" TargetType="Button">

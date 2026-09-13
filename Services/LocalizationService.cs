@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.Extensions.Logging;
 
 namespace Uninstaller.Services;
@@ -103,6 +103,8 @@ public class LocalizationService : ILocalizationService
         ["DeselectAll"] = "Clear selection",
         ["AppsCount"] = "{0} apps",
         ["OneApp"] = "1 app",
+        ["InstalledAppsCount"] = "{0} installed apps",
+        ["OneInstalledApp"] = "1 installed app",
         ["SelectedCount"] = "{0} selected",
         ["SystemBadge"] = "System",
         ["UserBadge"] = "User",
@@ -191,6 +193,8 @@ public class LocalizationService : ILocalizationService
         ["DeselectAll"] = "Quitar selección",
         ["AppsCount"] = "{0} aplicaciones",
         ["OneApp"] = "1 aplicación",
+        ["InstalledAppsCount"] = "{0} aplicaciones instaladas",
+        ["OneInstalledApp"] = "1 aplicación instalada",
         ["SelectedCount"] = "{0} seleccionadas",
         ["SystemBadge"] = "Sistema",
         ["UserBadge"] = "Usuario",

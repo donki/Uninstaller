@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.Extensions.Logging;
 using SocShared;
 using Uninstaller.Helpers;
@@ -24,7 +24,6 @@ public partial class MainPage : ContentPage
     private string _search = string.Empty;
     private bool _isBusy;
     private bool _loadedOnce;
-    private bool _suppressToggle;
 
     public MainPage()
     {
@@ -44,10 +43,7 @@ public partial class MainPage : ContentPage
     {
         base.OnAppearing();
 
-        _suppressToggle = true;
-        ShowSystemSwitch.IsToggled = _settings.ShowSystemApps;
-        _suppressToggle = false;
-
+        ApplyShowSystemState();
         ApplyTexts();
 
         if (!_loadedOnce)
@@ -63,11 +59,14 @@ public partial class MainPage : ContentPage
     private void ApplyTexts()
     {
         Title = _l["AppName"];
-        TitleLabel.Text = _l["AppsTitle"];
-        RefreshButton.Text = _l["Refresh"];
-        ShowSystemLabel.Text = _l["ShowSystemApps"];
-        SelectAllButton.Text = _l["SelectAll"];
-        ClearButton.Text = _l["DeselectAll"];
+        // Los botones de la cabecera son solo icono: el texto va a la ayuda contextual, que
+        // es lo unico que queda para explicarlos.
+        SemanticProperties.SetDescription(SortButton, _l["SortBy"]);
+        SemanticProperties.SetDescription(RefreshButton, _l["Refresh"]);
+        SemanticProperties.SetDescription(SearchButton, _l["SearchPlaceholder"]);
+        SemanticProperties.SetDescription(SelectAllButton, _l["SelectAll"]);
+        SemanticProperties.SetDescription(ClearButton, _l["DeselectAll"]);
+        SemanticProperties.SetDescription(ShowSystemButton, _l["ShowSystemApps"]);
         SearchEntry.Placeholder = _l["SearchPlaceholder"];
         EmptyLabel.Text = _l["EmptyList"];
         EmptyHintLabel.Text = _l["EmptyListHint"];
@@ -228,13 +227,16 @@ public partial class MainPage : ContentPage
         var total = _visible.Count;
         var selected = _apps.Count(a => a.IsSelected);
 
+        // Una sola linea: «184 aplicaciones instaladas · por Fecha de instalacion». El titulo
+        // aparte se quito para dejar sitio a la lista.
         var totalText = total == 1
-            ? _l["OneApp"]
-            : string.Format(_l.CurrentCulture, _l["AppsCount"], total);
+            ? _l["OneInstalledApp"]
+            : string.Format(_l.CurrentCulture, _l["InstalledAppsCount"], total);
 
         // El criterio de orden se muestra siempre junto al contador: era invisible y no se
-        // adivinaba que el boton de la derecha ordenaba (nota de autor del 2026-08-01).
-        var sortText = string.Format(_l.CurrentCulture, _l["SortedBy"], SortModeName(_settings.SortMode));
+        // adivinaba que el boton ordenaba (nota de autor del 2026-08-01). Sin el «por»: con el
+        // ancho de un movil, «184 aplicaciones instaladas · por Fecha de instalacion» no cabia.
+        var sortText = SortModeName(_settings.SortMode);
 
         CountLabel.Text = selected > 0
             ? $"{totalText} · {string.Format(_l.CurrentCulture, _l["SelectedCount"], selected)} · {sortText}"
@@ -270,13 +272,36 @@ public partial class MainPage : ContentPage
         UpdateCounts();
     }
 
-    private async void OnShowSystemToggled(object? sender, ToggledEventArgs e)
+    private async void OnShowSystemClicked(object? sender, EventArgs e)
     {
-        if (_suppressToggle)
-            return;
-
-        _settings.ShowSystemApps = e.Value;
+        _settings.ShowSystemApps = !_settings.ShowSystemApps;
+        ApplyShowSystemState();
         await LoadAppsAsync();
+    }
+
+    /// <summary>El conmutador de apps del sistema se pinta relleno cuando esta activo.</summary>
+    private void ApplyShowSystemState()
+    {
+        var on = _settings.ShowSystemApps;
+        ShowSystemButton.BackgroundColor = on ? (Color)Application.Current!.Resources["Primary"] : Colors.Transparent;
+        ShowSystemButton.ImageSource = on ? "ic_system_w.png" : "ic_system.png";
+    }
+
+    // La lupa despliega el buscador; al plegarlo se vacia el filtro, que si no se quedaba
+    // filtrando sin que se viera por que faltaban aplicaciones.
+    private void OnSearchClicked(object? sender, EventArgs e)
+    {
+        var show = !SearchRow.IsVisible;
+        SearchRow.IsVisible = show;
+
+        if (show)
+        {
+            SearchEntry.Focus();
+            return;
+        }
+
+        SearchEntry.Unfocus();
+        SearchEntry.Text = string.Empty;
     }
 
     private async void OnRefreshClicked(object? sender, EventArgs e) => await LoadAppsAsync();
