@@ -4,6 +4,11 @@ Desinstalador masivo de aplicaciones para Android, en .NET MAUI. Lista las apps 
 permite seleccionar varias con checkbox y desinstalarlas en secuencia. Cumple la Constitución de
 Proyectos de Software de Socratic.
 
+## Dónde conseguirla
+
+- **Google Play:** https://play.google.com/store/apps/details?id=com.socratic.uninstaller
+- **Releases de GitHub** (APK / EXE / MSIX de cada versión): https://github.com/donki/Uninstaller/releases
+
 ## Qué hace
 
 - Lista las apps instaladas (icono, nombre y paquete) con el `PackageManager` de Android.
