@@ -13,3 +13,4 @@ keystore.password.txt
 
 # Usuario/entorno
 *.user
+releases/
