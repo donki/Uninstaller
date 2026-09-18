@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Solo Android (constitucion anexo A.1: Android es el objetivo de publicacion). -->
-    <TargetFrameworks>net9.0-android36.0</TargetFrameworks>
+    <!-- Android y Windows con el mismo proyecto (constitucion anexo A.1). El destino WinUI solo
+         existe compilando desde Windows. -->
+    <TargetFrameworks>net10.0-android36.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>Uninstaller</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -17,8 +19,8 @@
     <ApplicationId>com.socratic.uninstaller</ApplicationId>
 
     <!-- Versions (constitucion 11 / A.4: ambos valores en sincronia) -->
-    <ApplicationDisplayVersion>2026.09.13.0</ApplicationDisplayVersion>
-    <ApplicationVersion>2026091300</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.09.18.00</ApplicationDisplayVersion>
+    <ApplicationVersion>2026091800</ApplicationVersion>
 
     <!-- Accept Android SDK Licenses -->
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
@@ -27,7 +29,7 @@
     <PackageId>Uninstaller</PackageId>
     <Title>Uninstaller</Title>
     <Product>Uninstaller</Product>
-    <Description>Desinstalador masivo de aplicaciones para Android: lista las apps instaladas, selecciona varias y desinstalalas en secuencia.</Description>
+    <Description>Desinstalador masivo de aplicaciones para Android y Windows: lista las apps instaladas, selecciona varias y desinstalalas en secuencia.</Description>
     <Copyright>Copyright © 2026 Socratic</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>uninstall;apps;android;maui;dotnet</PackageTags>
@@ -36,6 +38,8 @@
 
     <!-- Platform versions -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 
     <!-- Android specific -->
     <AndroidPackageFormat>apk</AndroidPackageFormat>
@@ -45,9 +49,24 @@
     <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
     <UseInterpreter>false</UseInterpreter>
 
-    <AssemblyVersion>2026.07.19.0</AssemblyVersion>
-    <FileVersion>2026.07.19.0</FileVersion>
+    <AssemblyVersion>2026.9.18.0</AssemblyVersion>
+    <FileVersion>2026.9.18.0</FileVersion>
   </PropertyGroup>
+
+  <!-- Windows: sin empaquetar durante el desarrollo (el exe arranca directamente); el MSIX para la
+       Store lo genera tools\empaquetar-msix.ps1 con WindowsPackageType=MSIX. -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <WindowsPackageType Condition="'$(WindowsPackageType)' == ''">None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <UseRidGraph>true</UseRidGraph>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <!-- Iconos de los programas Win32 (DisplayIcon del registro): se extraen con GDI+. -->
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
 
   <!-- Release configuration for Android -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
@@ -81,7 +100,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
   </ItemGroup>
 
   <!-- Notas de autor compartidas (una sola fuente para todas las apps) -->

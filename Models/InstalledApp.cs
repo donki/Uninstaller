@@ -1,10 +1,10 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 
 namespace Uninstaller.Models;
 
 /// <summary>
 /// Una aplicacion instalada en el dispositivo (constitucion 5: modelo de datos sin logica de
-/// presentacion). La construye el servicio de inventario especifico de Android.
+/// presentacion). La construye el servicio de inventario de cada plataforma (Android o Windows).
 /// </summary>
 public class InstalledApp : INotifyPropertyChanged
 {
@@ -13,6 +13,15 @@ public class InstalledApp : INotifyPropertyChanged
     public required string Label { get; init; }
 
     public bool IsSystem { get; init; }
+
+    /// <summary>Editor del programa (Windows). En Android no hay: queda vacio.</summary>
+    public string Publisher { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Segunda linea de la fila: el nombre de paquete en Android (dice de quien es la app) y el
+    /// editor en Windows (el identificador ahi es una clave del registro, sin interes).
+    /// </summary>
+    public string Subtitle => Publisher.Length > 0 ? Publisher : PackageName;
 
     /// <summary>Fecha de primera instalacion (PackageInfo.FirstInstallTime).</summary>
     public DateTime InstallDate { get; init; }

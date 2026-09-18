@@ -1,12 +1,13 @@
-# Uninstaller
+﻿# Uninstaller
 
-Desinstalador masivo de aplicaciones para Android, en .NET MAUI. Lista las apps instaladas,
-permite seleccionar varias con checkbox y desinstalarlas en secuencia. Cumple la Constitución de
-Proyectos de Software de Socratic.
+Desinstalador masivo de aplicaciones para **Android y Windows**, en .NET MAUI (el mismo proyecto
+para los dos). Lista las apps instaladas, permite seleccionar varias con checkbox y desinstalarlas
+en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
 
 ## Dónde conseguirla
 
 - **Google Play:** https://play.google.com/store/apps/details?id=com.socratic.uninstaller
+- **Microsoft Store:** «sOC Uninstaller» (en cuanto Partner Center dé el enlace).
 - **Releases de GitHub** (APK / EXE / MSIX de cada versión): https://github.com/donki/Uninstaller/releases
 
 ## Qué hace
@@ -17,6 +18,12 @@ Proyectos de Software de Socratic.
 - Android **no** permite el borrado masivo silencioso: por cada app seleccionada se lanza el
   intent de desinstalación del sistema (`ACTION_UNINSTALL_PACKAGE`), que el usuario confirma.
   Al terminar, la lista se refresca para reflejar lo que quedó instalado.
+- **En Windows** (`Platforms/Windows/AppInventoryService`): los programas Win32 salen de las claves
+  `Uninstall` del registro (64 bits, 32 bits y por usuario: nombre, editor, versión, fecha, tamaño
+  estimado, icono) y las apps de la Microsoft Store del `PackageManager`. «Apps del sistema» son los
+  componentes de Windows. Desinstalar abre el desinstalador del fabricante (o `msiexec /X`) y espera a
+  que su clave desaparezca; los paquetes MSIX se quitan con `RemovePackageAsync`, sin diálogo.
+  También uno detrás de otro.
 
 ## Arquitectura (constitución 5, 7)
 

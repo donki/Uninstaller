@@ -34,6 +34,16 @@ public partial class MainPage : ContentPage
         _inventory = ServiceHelper.GetRequiredService<IAppInventoryService>();
         _toast = ServiceHelper.GetRequiredService<IToastService>();
         _update = ServiceHelper.GetRequiredService<UpdateService>();
+#if WINDOWS
+        // El «toast» de Windows lo pinta la propia pagina: una franja que se esconde a los tres segundos.
+        Platforms.Windows.ToastService.ToastRequested += async message =>
+        {
+            ToastLabel.Text = message;
+            ToastStrip.IsVisible = true;
+            await Task.Delay(3000);
+            ToastStrip.IsVisible = false;
+        };
+#endif
         _logger = ServiceHelper.GetRequiredService<ILogger<MainPage>>();
 
         _l.LanguageChanged += (_, _) => ApplyTexts();
@@ -142,7 +152,7 @@ public partial class MainPage : ContentPage
             ? _apps
             : _apps.Where(app =>
                 app.Label.Contains(term, StringComparison.CurrentCultureIgnoreCase) ||
-                app.PackageName.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
+                app.Subtitle.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
 
         AppsList.ItemsSource = _visible;
     }
@@ -320,7 +330,7 @@ public partial class MainPage : ContentPage
         var confirm = await ModernDialog.AlertAsync(
             this,
             _l["ConfirmUninstallTitle"],
-            string.Format(_l.CurrentCulture, _l["ConfirmUninstallMany"], selected.Count),
+            string.Format(_l.CurrentCulture, _l[DeviceInfo.Platform == DevicePlatform.WinUI ? "ConfirmUninstallManyWindows" : "ConfirmUninstallMany"], selected.Count),
             _l["Continue"], _l["Cancel"]);
 
         if (!confirm)
@@ -331,7 +341,8 @@ public partial class MainPage : ContentPage
         {
             try
             {
-                // Android exige la confirmacion del usuario por cada app (sin borrado masivo silencioso).
+                // Android exige la confirmacion del usuario por cada app (sin borrado masivo silencioso);
+                // en Windows cada programa abre su propio desinstalador, tambien uno detras de otro.
                 if (await _inventory.UninstallAsync(app.PackageName))
                     done++;
             }

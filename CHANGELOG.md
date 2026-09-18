@@ -1,6 +1,19 @@
-# Changelog
+﻿# Changelog
 
-Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.N` (constitucion 11).
+Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
+
+## 2026.09.18.00 — También para Windows
+
+`versionCode`: 2026091800 · Windows `2026.9.18.0`
+
+- **Versión para Windows con el mismo proyecto MAUI** (constitución, anexo A.1): lista los
+  programas Win32 del registro (64 bits, 32 bits y por usuario) y las apps de la Microsoft Store,
+  con icono, editor, versión, fecha y tamaño estimado; buscador, ordenación y selección múltiple
+  como en Android. Desinstalar abre el desinstalador de cada programa uno detrás de otro (o
+  `msiexec`), y las apps de la Store se quitan directamente. «Apps del sistema» son los componentes
+  de Windows. Se entrega como EXE autocontenido y MSIX.
+- El proyecto pasa a .NET 10 (`net10.0-android36.0` y `net10.0-windows10.0.19041.0`).
+- La segunda línea de cada fila es el editor en Windows (en Android sigue siendo el paquete).
 
 ## 2026.08.28.1
 

@@ -96,7 +96,7 @@
 
                                 <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
                                     <Label Text="{Binding Label}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
-                                    <Label Text="{Binding PackageName}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
                                     <!-- Fecha de instalacion, ultima actualizacion y tamano: son los
                                          criterios por los que se puede ordenar, asi que se ven en la fila. -->
                                     <Label Text="{Binding Details}" Style="{StaticResource HintText}" LineBreakMode="TailTruncation" />
@@ -138,6 +138,22 @@
                 <Label x:Name="LoadingLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" />
             </VerticalStackLayout>
         </Grid>
+
+        <!-- Aviso breve (el «toast» de Android) en Windows: una franja que se esconde sola. -->
+        <Border Grid.Row="1"
+                x:Name="ToastStrip"
+                IsVisible="False"
+                VerticalOptions="End"
+                HorizontalOptions="Center"
+                Margin="24,0,24,16"
+                Padding="16,10"
+                StrokeThickness="0"
+                BackgroundColor="{StaticResource Primary}">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="10" />
+            </Border.StrokeShape>
+            <Label x:Name="ToastLabel" TextColor="White" />
+        </Border>
 
         <!-- Accion principal: desinstalar seleccionadas -->
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="12,6,12,12">
