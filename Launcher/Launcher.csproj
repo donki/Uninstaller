@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Lanzador de un solo exe para Windows. WinUI 3 no admite PublishSingleFile (necesita sus
+    ficheros al lado del exe real: falla con 0x80040111 al activar Microsoft.UI.Xaml), asi que
+    este exe nativo lleva dentro la carpeta publicada comprimida (app.zip), la desempaqueta en
+    %LOCALAPPDATA%\sOCUninstaller\app\<version> la primera vez o cuando cambia la version, y
+    arranca Uninstaller.exe desde ahi. Lo genera tools\publicar-windows.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>sOCUninstaller</AssemblyName>
+    <RootNamespace>Uninstaller.Launcher</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Autocontenido, recortado y en un solo fichero (NativeAOT necesitaria el enlazador de VC++
+         en la maquina que compila; asi no depende de nada). -->
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <ApplicationIcon>..\Resources\AppIcon\appicon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>$(LauncherVersion)</Version>
+    <FileVersion>$(LauncherVersion)</FileVersion>
+    <AssemblyVersion>$(LauncherVersion)</AssemblyVersion>
+    <Product>sOC Uninstaller</Product>
+    <Company>sOCratic</Company>
+    <Copyright>Copyright © 2026 sOCratic</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="app.zip" LogicalName="app.zip" />
+    <EmbeddedResource Include="version.txt" LogicalName="version.txt" />
+  </ItemGroup>
+
+</Project>

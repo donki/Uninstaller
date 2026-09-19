@@ -23,7 +23,13 @@ en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
   estimado, icono) y las apps de la Microsoft Store del `PackageManager`. «Apps del sistema» son los
   componentes de Windows. Desinstalar abre el desinstalador del fabricante (o `msiexec /X`) y espera a
   que su clave desaparezca; los paquetes MSIX se quitan con `RemovePackageAsync`, sin diálogo.
-  También uno detrás de otro.
+  También uno detrás de otro. Antes de empezar pregunta si hacerlo **desatendido** (sin preguntas)
+  donde el instalador lo admite: Windows Installer, Inno Setup, NSIS, `QuietUninstallString` y
+  apps de la Store. Al minimizar se va a la bandeja.
+- **Paquetes Windows** (`tools\publicar-windows.ps1 -Msix`): `sOCUninstaller.exe`, un solo fichero
+  (lanzador que lleva la app WinUI comprimida dentro y la desempaqueta en
+  `%LOCALAPPDATA%\sOCUninstaller\app\<versión>`, porque WinUI no admite el single-file de .NET),
+  más el zip de la carpeta y el MSIX sin firmar para la Store.
 
 ## Arquitectura (constitución 5, 7)
 

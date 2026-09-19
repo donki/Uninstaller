@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Win32;
 using Uninstaller.Models;
@@ -32,7 +32,13 @@ public class AppInventoryService : IAppInventoryService
     // completo del paquete): la pagina solo conoce el PackageName.
     private readonly Dictionary<string, Win32Entry> _win32 = new(StringComparer.OrdinalIgnoreCase);
 
-    private sealed record Win32Entry(RegistryKey Hive, string KeyPath, string UninstallString, bool IsMsi);
+    /// <summary>Que instalador hizo el programa: de eso depende como se le pide silencio.</summary>
+    private enum Installer { Unknown, Msi, InnoSetup, Nsis }
+
+    private sealed record Win32Entry(RegistryKey Hive, string KeyPath, string UninstallString, string? QuietUninstallString, Installer Installer)
+    {
+        public bool SupportsUnattended => QuietUninstallString is not null || Installer != Installer.Unknown;
+    }
 
     public Task<IReadOnlyList<InstalledApp>> GetInstalledAppsAsync(bool includeSystem)
     {
@@ -47,13 +53,13 @@ public class AppInventoryService : IAppInventoryService
         });
     }
 
-    public async Task<bool> UninstallAsync(string packageName)
+    public async Task<bool> UninstallAsync(string packageName, bool unattended)
     {
         if (packageName.StartsWith(MsixPrefix, StringComparison.Ordinal))
             return await RemovePackageAsync(packageName[MsixPrefix.Length..]);
 
         if (_win32.TryGetValue(packageName, out var entry))
-            return await RunUninstallerAsync(entry);
+            return await RunUninstallerAsync(entry, unattended);
 
         throw new InvalidOperationException("Unknown program: " + packageName);
     }
@@ -83,9 +89,12 @@ public class AppInventoryService : IAppInventoryService
                     if (key is null)
                         continue;
                     var display = key.GetValue("DisplayName") as string;
-                    var uninstall = key.GetValue("QuietUninstallString") as string ?? key.GetValue("UninstallString") as string;
+                    var quiet = key.GetValue("QuietUninstallString") as string;
+                    var uninstall = key.GetValue("UninstallString") as string ?? quiet;
                     if (string.IsNullOrWhiteSpace(display) || string.IsNullOrWhiteSpace(uninstall))
                         continue;
+                    if (string.IsNullOrWhiteSpace(quiet))
+                        quiet = null;
                     // Las actualizaciones (KB…) y los parches de MSI no son programas.
                     if ((key.GetValue("ParentKeyName") as string)?.Length > 0 || (key.GetValue("ReleaseType") as string) is "Update" or "Hotfix" or "Security Update")
                         continue;
@@ -100,7 +109,8 @@ public class AppInventoryService : IAppInventoryService
                     var id = Win32Prefix + name;
                     var isMsi = Convert.ToInt32(key.GetValue("WindowsInstaller", 0), CultureInfo.InvariantCulture) == 1
                                 || uninstall.Contains("msiexec", StringComparison.OrdinalIgnoreCase);
-                    _win32[id] = new Win32Entry(hive, path + "\\" + name, uninstall, isMsi);
+                    var entry = new Win32Entry(hive, path + "\\" + name, uninstall, quiet, isMsi ? Installer.Msi : DetectInstaller(uninstall));
+                    _win32[id] = entry;
 
                     var publisher = key.GetValue("Publisher") as string ?? string.Empty;
                     var installed = ParseInstallDate(key.GetValue("InstallDate") as string, key);
@@ -115,6 +125,7 @@ public class AppInventoryService : IAppInventoryService
                         SizeBytes = sizeKb * 1024,
                         Icon = ExtractIcon(key.GetValue("DisplayIcon") as string, uninstall),
                         Publisher = publisher,
+                        SupportsUnattended = entry.SupportsUnattended,
                     });
                 }
                 catch (Exception)
@@ -196,12 +207,9 @@ public class AppInventoryService : IAppInventoryService
     /// desinstalado cuando su clave del registro ha desaparecido; algunos desinstaladores lanzan
     /// otro proceso y se cierran enseguida, asi que despues se le da un margen.
     /// </summary>
-    private static async Task<bool> RunUninstallerAsync(Win32Entry entry)
+    private static async Task<bool> RunUninstallerAsync(Win32Entry entry, bool unattended)
     {
-        var (file, arguments) = SplitCommand(entry.UninstallString);
-        // «msiexec /I{…}» en UninstallString es «modificar»: para quitar hay que pedir /X.
-        if (entry.IsMsi && arguments.Contains("/I", StringComparison.OrdinalIgnoreCase) && !arguments.Contains("/X", StringComparison.OrdinalIgnoreCase))
-            arguments = arguments.Replace("/I", "/X", StringComparison.OrdinalIgnoreCase);
+        var (file, arguments) = UninstallCommand(entry, unattended);
 
         var info = new ProcessStartInfo
         {
@@ -222,6 +230,64 @@ public class AppInventoryService : IAppInventoryService
             await Task.Delay(1000);
         }
         return !KeyExists(entry);
+    }
+
+    /// <summary>
+    /// La orden de desinstalar, con o sin preguntas. Desatendido: la QuietUninstallString del
+    /// registro si la hay; si no, los modificadores de cada instalador (msiexec /qn, Inno Setup
+    /// /VERYSILENT, NSIS /S). Los desconocidos van siempre con su asistente.
+    /// </summary>
+    private static (string File, string Arguments) UninstallCommand(Win32Entry entry, bool unattended)
+    {
+        if (unattended && entry.QuietUninstallString is not null)
+            return SplitCommand(entry.QuietUninstallString);
+
+        var (file, arguments) = SplitCommand(entry.UninstallString);
+        if (entry.Installer == Installer.Msi)
+        {
+            // «msiexec /I{…}» en UninstallString es «modificar»: para quitar hay que pedir /X.
+            if (arguments.Contains("/I", StringComparison.OrdinalIgnoreCase) && !arguments.Contains("/X", StringComparison.OrdinalIgnoreCase))
+                arguments = arguments.Replace("/I", "/X", StringComparison.OrdinalIgnoreCase);
+            if (unattended)
+                arguments += " /qn /norestart";
+            return (file, arguments);
+        }
+        if (!unattended)
+            return (file, arguments);
+        return entry.Installer switch
+        {
+            Installer.InnoSetup => (file, (arguments + " /VERYSILENT /SUPPRESSMSGBOXES /NORESTART").Trim()),
+            Installer.Nsis => (file, (arguments + " /S").Trim()),
+            _ => (file, arguments),
+        };
+    }
+
+    /// <summary>
+    /// Inno Setup y NSIS se reconocen por una marca en el propio ejecutable de desinstalar (los dos
+    /// la llevan en claro en su cabecera). Se mira solo el primer trozo del fichero.
+    /// </summary>
+    private static Installer DetectInstaller(string uninstall)
+    {
+        try
+        {
+            var (file, _) = SplitCommand(uninstall);
+            if (!File.Exists(file))
+                return Installer.Unknown;
+            var name = Path.GetFileName(file);
+            using var stream = File.OpenRead(file);
+            var buffer = new byte[Math.Min(stream.Length, 2L * 1024 * 1024)];
+            var read = stream.Read(buffer, 0, buffer.Length);
+            var text = System.Text.Encoding.ASCII.GetString(buffer, 0, read);
+            if (text.Contains("Inno Setup", StringComparison.Ordinal) || name.StartsWith("unins", StringComparison.OrdinalIgnoreCase) && File.Exists(Path.ChangeExtension(file, ".dat")))
+                return Installer.InnoSetup;
+            if (text.Contains("Nullsoft", StringComparison.Ordinal) || text.Contains("NSIS Error", StringComparison.Ordinal))
+                return Installer.Nsis;
+        }
+        catch (Exception)
+        {
+            // Sin acceso al fichero: se trata como desconocido y va con asistente.
+        }
+        return Installer.Unknown;
     }
 
     private static bool KeyExists(Win32Entry entry)
@@ -292,6 +358,7 @@ public class AppInventoryService : IAppInventoryService
                     SizeBytes = 0,
                     Icon = icon,
                     Publisher = publisher,
+                    SupportsUnattended = true,
                 });
             }
             catch (Exception)

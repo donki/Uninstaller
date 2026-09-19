@@ -336,6 +336,19 @@ public partial class MainPage : ContentPage
         if (!confirm)
             return;
 
+        // Windows: desatendido (sin preguntas) donde el instalador lo admite, o con el asistente de
+        // cada uno. Se pregunta solo si alguno de los marcados lo admite; en Android no hay opcion.
+        var unattended = false;
+        var quiet = selected.Count(a => a.SupportsUnattended);
+        if (DeviceInfo.Platform == DevicePlatform.WinUI && quiet > 0)
+        {
+            unattended = await ModernDialog.AlertAsync(
+                this,
+                _l["UnattendedTitle"],
+                string.Format(_l.CurrentCulture, _l["UnattendedBody"], quiet, selected.Count),
+                _l["Unattended"], _l["WithWizard"]);
+        }
+
         var done = 0;
         foreach (var app in selected)
         {
@@ -343,7 +356,7 @@ public partial class MainPage : ContentPage
             {
                 // Android exige la confirmacion del usuario por cada app (sin borrado masivo silencioso);
                 // en Windows cada programa abre su propio desinstalador, tambien uno detras de otro.
-                if (await _inventory.UninstallAsync(app.PackageName))
+                if (await _inventory.UninstallAsync(app.PackageName, unattended))
                     done++;
             }
             catch (Exception ex)

@@ -1,4 +1,4 @@
-using Uninstaller.Models;
+﻿using Uninstaller.Models;
 
 namespace Uninstaller.Services;
 
@@ -15,9 +15,11 @@ public interface IAppInventoryService
     Task<IReadOnlyList<InstalledApp>> GetInstalledAppsAsync(bool includeSystem);
 
     /// <summary>
-    /// Lanza el intent del sistema para desinstalar un paquete y espera a que el usuario
-    /// confirme o cancele. Devuelve <c>true</c> si el paquete quedo desinstalado.
-    /// Android no permite el borrado masivo silencioso: cada app la confirma el usuario.
+    /// Desinstala un paquete y espera a que termine. Devuelve <c>true</c> si quedo desinstalado.
+    /// En Android lanza el intent del sistema, que el usuario confirma (no hay borrado masivo
+    /// silencioso; <paramref name="unattended"/> se ignora). En Windows abre el desinstalador del
+    /// programa; con <paramref name="unattended"/> lo lanza sin preguntas cuando el instalador lo
+    /// admite (Windows Installer, Inno Setup, NSIS, QuietUninstallString y apps de la Store).
     /// </summary>
-    Task<bool> UninstallAsync(string packageName);
+    Task<bool> UninstallAsync(string packageName, bool unattended);
 }

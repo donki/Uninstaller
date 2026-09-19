@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.18.00",
+  "version": "2026.09.19.00",
   "url": "https://github.com/donki/Uninstaller/releases",
-  "notes": "Version para Windows con el mismo proyecto."
+  "notes": "Windows: un solo exe, modo desatendido y bandeja."
 }

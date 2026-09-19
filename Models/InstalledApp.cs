@@ -14,6 +14,12 @@ public class InstalledApp : INotifyPropertyChanged
 
     public bool IsSystem { get; init; }
 
+    /// <summary>
+    /// Windows: el desinstalador admite el modo desatendido (sin preguntas): Windows Installer,
+    /// Inno Setup, NSIS, QuietUninstallString o app de la Store. En Android siempre false.
+    /// </summary>
+    public bool SupportsUnattended { get; init; }
+
     /// <summary>Editor del programa (Windows). En Android no hay: queda vacio.</summary>
     public string Publisher { get; init; } = string.Empty;
 

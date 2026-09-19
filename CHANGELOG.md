@@ -2,6 +2,22 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.00 — Windows: un solo exe, modo desatendido y bandeja
+
+`versionCode`: 2026091900 · Windows `2026.9.19.0`
+
+- **Un solo exe** (`sOCUninstaller.exe`): WinUI no admite el «single file» de .NET (falla al
+  activar Microsoft.UI.Xaml), así que un lanzador pequeño lleva la aplicación dentro comprimida, la
+  desempaqueta en `%LOCALAPPDATA%\sOCUninstaller\app\<versión>` la primera vez (o cuando cambia la
+  versión) y la arranca desde ahí. Lo genera `tools\publicar-windows.ps1`, junto con el MSIX.
+- **Modo desatendido**: al confirmar, si alguno de los marcados lo admite, pregunta si hacerlo
+  desatendido (sin preguntas) o con el asistente de cada uno. Sin preguntas van Windows Installer
+  (`/qn /norestart`), Inno Setup (`/VERYSILENT`), NSIS (`/S`), los que traen `QuietUninstallString`
+  y las apps de la Store; el resto abre su asistente igualmente. Windows puede pedir permiso de
+  administrador de todas formas.
+- **Al minimizar se va a la bandeja** (icono en el área de notificación): clic para volver, botón
+  derecho para Abrir o Salir.
+
 ## 2026.09.18.00 — También para Windows
 
 `versionCode`: 2026091800 · Windows `2026.9.18.0`

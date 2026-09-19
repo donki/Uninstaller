@@ -1,4 +1,4 @@
-using Android.Content;
+﻿using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
 using Android.Graphics.Drawables;
@@ -78,7 +78,7 @@ public class AppInventoryService : IAppInventoryService
         });
     }
 
-    public Task<bool> UninstallAsync(string packageName)
+    public Task<bool> UninstallAsync(string packageName, bool unattended)
     {
         var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
         if (activity is null)

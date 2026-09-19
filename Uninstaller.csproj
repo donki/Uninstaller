@@ -11,6 +11,8 @@
     <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- El lanzador de un solo exe (Launcher\) es otro proyecto: fuera de este. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Launcher\**</DefaultItemExcludes>
 
     <!-- Display name -->
     <ApplicationTitle>Uninstaller</ApplicationTitle>
@@ -19,8 +21,8 @@
     <ApplicationId>com.socratic.uninstaller</ApplicationId>
 
     <!-- Versions (constitucion 11 / A.4: ambos valores en sincronia) -->
-    <ApplicationDisplayVersion>2026.09.18.00</ApplicationDisplayVersion>
-    <ApplicationVersion>2026091800</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.09.19.00</ApplicationDisplayVersion>
+    <ApplicationVersion>2026091900</ApplicationVersion>
 
     <!-- Accept Android SDK Licenses -->
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
@@ -49,8 +51,8 @@
     <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
     <UseInterpreter>false</UseInterpreter>
 
-    <AssemblyVersion>2026.9.18.0</AssemblyVersion>
-    <FileVersion>2026.9.18.0</FileVersion>
+    <AssemblyVersion>2026.9.19.0</AssemblyVersion>
+    <FileVersion>2026.9.19.0</FileVersion>
   </PropertyGroup>
 
   <!-- Windows: sin empaquetar durante el desarrollo (el exe arranca directamente); el MSIX para la
