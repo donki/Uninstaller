@@ -56,10 +56,12 @@
                             ImageSource="ic_system.png"
                             Clicked="OnShowSystemClicked" />
                     <!-- Espacio en disco (estilo TreeSize), solo en Windows: la columna se añade en el code-behind. -->
+                    <!-- Con fondo: es otra utilidad, no un filtro mas de la lista. -->
                     <Button Grid.Column="6"
                             x:Name="DiskButton"
                             Style="{StaticResource IconButton}"
-                            ImageSource="ic_disk.png"
+                            BackgroundColor="{StaticResource Primary}"
+                            ImageSource="ic_disk_w.png"
                             Clicked="OnDiskClicked"
                             IsVisible="False" />
                 </Grid>

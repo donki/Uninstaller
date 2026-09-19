@@ -2,6 +2,15 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.05 — Espacio en disco: una fila de botones y progreso en las operaciones
+
+`versionCode`: 2026091905 · Windows `2026.9.19.5`
+
+- Los botones de Espacio en disco van en **una sola fila a todo el ancho** (vistas y acciones), y
+  el botón que abre la utilidad desde la lista lleva fondo: es otra herramienta, no un filtro más.
+- **Progreso a la vista** al enviar a la papelera y al exportar: la operación va en segundo plano
+  con un aviso en pantalla, y al borrar Windows enseña además su propio diálogo de progreso.
+
 ## 2026.09.19.04 — Espacio en disco: mapa de rectángulos
 
 `versionCode`: 2026091904 · Windows `2026.9.19.4`

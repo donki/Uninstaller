@@ -26,24 +26,20 @@
                 <Label x:Name="StatusLabel" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
                 <ProgressBar x:Name="ScanProgress" IsVisible="False" ProgressColor="{StaticResource Primary}" />
 
-                <!-- Vistas: arbol, ficheros grandes, tipos, antigüedad, duplicados. -->
-                <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="6">
+                <!-- Una sola fila a todo el ancho: vistas (arbol, mapa, grandes, tipos, antigüedad,
+                     duplicados) y acciones (subir, Explorador, copiar ruta, papelera, CSV). -->
+                <Grid ColumnDefinitions="*,*,*,*,*,*,*,*,*,*,*" ColumnSpacing="6">
                     <Button Grid.Column="0" x:Name="TreeButton" Style="{StaticResource IconButton}" ImageSource="ic_tree.png" Clicked="OnViewClicked" />
-                    <Button Grid.Column="5" x:Name="MapButton" Style="{StaticResource IconButton}" ImageSource="ic_treemap.png" Clicked="OnViewClicked" />
-                    <Button Grid.Column="1" x:Name="LargestButton" Style="{StaticResource IconButton}" ImageSource="ic_biggest.png" Clicked="OnViewClicked" />
-                    <Button Grid.Column="2" x:Name="TypesButton" Style="{StaticResource IconButton}" ImageSource="ic_types.png" Clicked="OnViewClicked" />
-                    <Button Grid.Column="3" x:Name="AgeButton" Style="{StaticResource IconButton}" ImageSource="ic_clock.png" Clicked="OnViewClicked" />
-                    <Button Grid.Column="4" x:Name="DuplicatesButton" Style="{StaticResource IconButton}" ImageSource="ic_duplicates.png" Clicked="OnViewClicked" />
-                </Grid>
-
-                <!-- Acciones sobre lo seleccionado: abrir en el Explorador, copiar ruta, papelera;
-                     y exportar la vista a CSV. -->
-                <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
-                    <Button Grid.Column="4" x:Name="UpButton" Style="{StaticResource IconButton}" ImageSource="ic_up.png" Clicked="OnUpClicked" IsEnabled="False" />
-                    <Button Grid.Column="0" x:Name="OpenButton" Style="{StaticResource IconButton}" ImageSource="ic_open.png" Clicked="OnOpenClicked" IsEnabled="False" />
-                    <Button Grid.Column="1" x:Name="CopyButton" Style="{StaticResource IconButton}" ImageSource="ic_copy_path.png" Clicked="OnCopyClicked" IsEnabled="False" />
-                    <Button Grid.Column="2" x:Name="DeleteButton" Style="{StaticResource IconButton}" ImageSource="ic_trash.png" BorderColor="#D14343" Clicked="OnDeleteClicked" IsEnabled="False" />
-                    <Button Grid.Column="3" x:Name="ExportButton" Style="{StaticResource IconButton}" ImageSource="ic_export.png" Clicked="OnExportClicked" IsEnabled="False" />
+                    <Button Grid.Column="1" x:Name="MapButton" Style="{StaticResource IconButton}" ImageSource="ic_treemap.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="2" x:Name="LargestButton" Style="{StaticResource IconButton}" ImageSource="ic_biggest.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="3" x:Name="TypesButton" Style="{StaticResource IconButton}" ImageSource="ic_types.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="4" x:Name="AgeButton" Style="{StaticResource IconButton}" ImageSource="ic_clock.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="5" x:Name="DuplicatesButton" Style="{StaticResource IconButton}" ImageSource="ic_duplicates.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="6" x:Name="UpButton" Style="{StaticResource IconButton}" ImageSource="ic_up.png" Clicked="OnUpClicked" IsEnabled="False" />
+                    <Button Grid.Column="7" x:Name="OpenButton" Style="{StaticResource IconButton}" ImageSource="ic_open.png" Clicked="OnOpenClicked" IsEnabled="False" />
+                    <Button Grid.Column="8" x:Name="CopyButton" Style="{StaticResource IconButton}" ImageSource="ic_copy_path.png" Clicked="OnCopyClicked" IsEnabled="False" />
+                    <Button Grid.Column="9" x:Name="DeleteButton" Style="{StaticResource IconButton}" ImageSource="ic_trash.png" BorderColor="#D14343" Clicked="OnDeleteClicked" IsEnabled="False" />
+                    <Button Grid.Column="10" x:Name="ExportButton" Style="{StaticResource IconButton}" ImageSource="ic_export.png" Clicked="OnExportClicked" IsEnabled="False" />
                 </Grid>
             </VerticalStackLayout>
         </Border>
@@ -73,6 +69,15 @@
                 <Label x:Name="EmptyLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" Padding="30" />
             </CollectionView.EmptyView>
         </CollectionView>
+
+        <!-- Operacion en curso (papelera, exportar): la pantalla no se queda muda. -->
+        <Grid Grid.Row="1" x:Name="BusyOverlay" IsVisible="False" InputTransparent="False"
+              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}" Opacity="0.92" ZIndex="10">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12" Padding="32,0">
+                <ActivityIndicator IsRunning="True" WidthRequest="42" HeightRequest="42" />
+                <Label x:Name="BusyLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" LineBreakMode="MiddleTruncation" />
+            </VerticalStackLayout>
+        </Grid>
 
         <!-- Mapa de rectangulos (treemap): un toque elige la carpeta, dos entran en ella; la flecha sube. -->
         <Border Grid.Row="1" x:Name="MapPanel" Style="{StaticResource Card}" Margin="12,6,12,12" Padding="4" IsVisible="False">

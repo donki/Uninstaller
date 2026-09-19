@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Uninstaller.Services;
 
@@ -43,7 +43,7 @@ public class ShellActions : IShellActions
         {
             wFunc = 3,                              // FO_DELETE
             pFrom = path + "\0\0",
-            fFlags = 0x0040 | 0x0010 | 0x0004,      // FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT
+            fFlags = 0x0040 | 0x0010,               // FOF_ALLOWUNDO | FOF_NOCONFIRMATION (con el dialogo de progreso de Windows)
         };
         var result = SHFileOperation(ref op);
         return result == 0 && !op.fAnyOperationsAborted;

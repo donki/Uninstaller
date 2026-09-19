@@ -266,7 +266,7 @@ public partial class DiskUsagePage : ContentPage
         }
         TreeList.IsVisible = mode == ViewMode.Tree;
         MapPanel.IsVisible = mode == ViewMode.Map;
-        UpButton.IsVisible = mode == ViewMode.Map;
+        UpButton.IsEnabled = mode == ViewMode.Map && _mapRoot?.Parent is not null;
         LargestList.IsVisible = mode == ViewMode.Largest;
         AggregateList.IsVisible = mode is ViewMode.Types or ViewMode.Age;
         DuplicatesList.IsVisible = mode == ViewMode.Duplicates;
@@ -492,13 +492,27 @@ public partial class DiskUsagePage : ContentPage
             string.Format(_l.CurrentCulture, _l[isFolder ? "DiskDeleteFolderConfirm" : "DiskDeleteFileConfirm"], path), _l["DiskDelete"], _l["Cancel"]);
         if (!confirm)
             return;
-        if (!_shell.MoveToRecycleBin(path))
+        // A la papelera en segundo plano y con el aviso a la vista: una carpeta grande tarda, y
+        // Windows enseña ademas su propio dialogo de progreso.
+        Busy(true, string.Format(_l.CurrentCulture, _l["DiskDeleting"], path));
+        bool ok;
+        try { ok = await Task.Run(() => _shell.MoveToRecycleBin(path)); }
+        finally { Busy(false, string.Empty); }
+        if (!ok)
         {
             await ModernDialog.AlertAsync(this, _l["Error"], string.Format(_l.CurrentCulture, _l["DiskDeleteFailed"], path), _l["Ok"]);
             return;
         }
         RemoveFromModel(path);
         _toast.Show(_l["DiskDeleted"]);
+    }
+
+    private void Busy(bool on, string text)
+    {
+        BusyLabel.Text = text;
+        BusyOverlay.IsVisible = on;
+        ScanButton.IsEnabled = !on;
+        DeleteButton.IsEnabled = !on && DeleteButton.IsEnabled;
     }
 
     /// <summary>Tras borrar: se quita del arbol y se restan los tamaños hacia arriba, sin volver a escanear.</summary>
@@ -603,14 +617,17 @@ public partial class DiskUsagePage : ContentPage
         }
         var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         var file = Path.Combine(folder, $"sOCUninstaller-espacio-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+        Busy(true, string.Format(_l.CurrentCulture, _l["DiskExporting"], file));
         try
         {
             await File.WriteAllTextAsync(file, sb.ToString(), new UTF8Encoding(true));
+            Busy(false, string.Empty);
             _toast.Show(string.Format(_l.CurrentCulture, _l["DiskExported"], file));
             _shell.RevealInExplorer(file);
         }
         catch (Exception ex)
         {
+            Busy(false, string.Empty);
             await ModernDialog.AlertAsync(this, _l["Error"], ex.Message, _l["Ok"]);
         }
     }
