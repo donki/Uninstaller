@@ -35,8 +35,12 @@ public class InstalledApp : INotifyPropertyChanged
     /// <summary>Fecha de la ultima actualizacion (PackageInfo.LastUpdateTime).</summary>
     public DateTime UpdatedDate { get; init; }
 
-    /// <summary>Tamano en disco de los APK de la app: el base mas los splits del App Bundle.</summary>
-    public long SizeBytes { get; init; }
+    /// <summary>
+    /// Tamano en disco: en Android los APK de la app (base mas splits); en Windows el EstimatedSize
+    /// del registro o, si no lo hay, lo que ocupa la carpeta de instalacion. Se puede rellenar
+    /// despues de crear la fila (la medida de la carpeta llega en paralelo).
+    /// </summary>
+    public long SizeBytes { get; set; }
 
     /// <summary>Icono de la app, ya convertido a un origen de imagen de MAUI.</summary>
     public ImageSource? Icon { get; init; }

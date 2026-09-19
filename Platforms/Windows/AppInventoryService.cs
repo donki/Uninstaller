@@ -46,8 +46,10 @@ public class AppInventoryService : IAppInventoryService
         {
             var result = new List<InstalledApp>();
             _win32.Clear();
-            ReadRegistry(includeSystem, result);
-            ReadPackages(includeSystem, result);
+            var folders = new Dictionary<InstalledApp, string>();
+            ReadRegistry(includeSystem, result, folders);
+            ReadPackages(includeSystem, result, folders);
+            MeasureFolders(folders);
             result.Sort((a, b) => b.InstallDate.CompareTo(a.InstallDate));
             return result;
         });
@@ -73,7 +75,7 @@ public class AppInventoryService : IAppInventoryService
         (Registry.CurrentUser, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
     ];
 
-    private void ReadRegistry(bool includeSystem, List<InstalledApp> result)
+    private void ReadRegistry(bool includeSystem, List<InstalledApp> result, Dictionary<InstalledApp, string> folders)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (hive, path) in UninstallKeys)
@@ -115,7 +117,8 @@ public class AppInventoryService : IAppInventoryService
                     var publisher = key.GetValue("Publisher") as string ?? string.Empty;
                     var installed = ParseInstallDate(key.GetValue("InstallDate") as string, key);
                     var sizeKb = Convert.ToInt64(key.GetValue("EstimatedSize", 0L), CultureInfo.InvariantCulture);
-                    result.Add(new InstalledApp
+                    var location = key.GetValue("InstallLocation") as string;
+                    var app = new InstalledApp
                     {
                         PackageName = id,
                         Label = version.Length > 0 ? $"{display} {version}" : display,
@@ -126,7 +129,11 @@ public class AppInventoryService : IAppInventoryService
                         Icon = ExtractIcon(key.GetValue("DisplayIcon") as string, uninstall),
                         Publisher = publisher,
                         SupportsUnattended = entry.SupportsUnattended,
-                    });
+                    };
+                    result.Add(app);
+                    // Sin EstimatedSize, se mide la carpeta de instalacion (si la declara).
+                    if (sizeKb <= 0 && !string.IsNullOrWhiteSpace(location))
+                        folders[app] = location.Trim().Trim('"');
                 }
                 catch (Exception)
                 {
@@ -315,7 +322,32 @@ public class AppInventoryService : IAppInventoryService
 
     // ------------------------------------------------------------------ MSIX (PackageManager)
 
-    private static void ReadPackages(bool includeSystem, List<InstalledApp> result)
+    /// <summary>
+    /// Lo que ocupa en disco cada carpeta de instalacion, en paralelo: son cientos de carpetas y
+    /// recorrerlas una detras de otra retrasaria la lista varios segundos.
+    /// </summary>
+    private static void MeasureFolders(Dictionary<InstalledApp, string> folders)
+    {
+        Parallel.ForEach(folders, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pair =>
+        {
+            try
+            {
+                if (!Directory.Exists(pair.Value))
+                    return;
+                long total = 0;
+                var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
+                foreach (var file in new DirectoryInfo(pair.Value).EnumerateFiles("*", options))
+                    total += file.Length;
+                pair.Key.SizeBytes = total;
+            }
+            catch (Exception)
+            {
+                // Carpeta sin permiso o desaparecida: se queda sin tamaño.
+            }
+        });
+    }
+
+    private static void ReadPackages(bool includeSystem, List<InstalledApp> result, Dictionary<InstalledApp, string> folders)
     {
         var manager = new PackageManager();
         var own = OwnPackageFamily();
@@ -348,7 +380,7 @@ public class AppInventoryService : IAppInventoryService
                 string publisher;
                 try { publisher = package.PublisherDisplayName; } catch (Exception) { publisher = string.Empty; }
 
-                result.Add(new InstalledApp
+                var app = new InstalledApp
                 {
                     PackageName = MsixPrefix + package.Id.FullName,
                     Label = $"{label} {v.Major}.{v.Minor}.{v.Build}.{v.Revision}",
@@ -359,7 +391,16 @@ public class AppInventoryService : IAppInventoryService
                     Icon = icon,
                     Publisher = publisher,
                     SupportsUnattended = true,
-                });
+                };
+                result.Add(app);
+                // El tamaño real es lo que ocupa la carpeta del paquete (los MSIX no lo declaran).
+                try
+                {
+                    var path = package.InstalledPath;
+                    if (!string.IsNullOrEmpty(path))
+                        folders[app] = path;
+                }
+                catch (Exception) { }
             }
             catch (Exception)
             {

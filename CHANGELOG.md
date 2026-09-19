@@ -2,6 +2,14 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.01 — Windows: lo que ocupa cada aplicación
+
+`versionCode`: 2026091901 · Windows `2026.9.19.1`
+
+- En Windows, el tamaño sale también para las apps de la Microsoft Store y para los programas que
+  no lo declaran en el registro: se mide lo que ocupa su carpeta de instalación (en paralelo, para
+  no retrasar la lista). Ordenar por tamaño ya sirve para ver qué se lleva el disco.
+
 ## 2026.09.19.00 — Windows: un solo exe, modo desatendido y bandeja
 
 `versionCode`: 2026091900 · Windows `2026.9.19.0`
