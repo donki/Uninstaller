@@ -14,3 +14,6 @@ keystore.password.txt
 # Usuario/entorno
 *.user
 releases/
+
+# Zip temporal del lanzador (lo genera tools/publicar-windows.ps1)
+Launcher/app.zip
