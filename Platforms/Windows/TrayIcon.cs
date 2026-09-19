@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace Uninstaller.Platforms.Windows;
 
@@ -7,7 +7,7 @@ namespace Uninstaller.Platforms.Windows;
 /// volver, boton derecho para «Abrir» o «Salir». WinUI no trae icono de bandeja, asi que va con
 /// Shell_NotifyIcon y una subclase del procedimiento de la ventana (para cazar SC_MINIMIZE).
 /// </summary>
-internal sealed class TrayIcon
+public sealed class TrayIcon
 {
     private const int WmSysCommand = 0x0112;
     private const int WmCommand = 0x0111;
@@ -27,6 +27,12 @@ internal sealed class TrayIcon
 
     private delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+    /// <summary>Si al minimizar se esconde en la bandeja (ajuste del usuario) o se minimiza como siempre.</summary>
+    public bool MinimizeToTray { get; set; } = true;
+
+    /// <summary>Esconder ahora (arranque con --tray).</summary>
+    public void HideToTray() => Hide();
+
     public TrayIcon(IntPtr hwnd, Func<string, string> text, Action exit)
     {
         _hwnd = hwnd;
@@ -40,7 +46,7 @@ internal sealed class TrayIcon
     {
         switch (msg)
         {
-            case WmSysCommand when ((long)wParam & 0xFFF0) == ScMinimize:
+            case WmSysCommand when ((long)wParam & 0xFFF0) == ScMinimize && MinimizeToTray:
                 Hide();
                 return IntPtr.Zero;
             case WmTray:

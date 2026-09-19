@@ -1,4 +1,4 @@
-namespace Uninstaller.Services;
+﻿namespace Uninstaller.Services;
 
 /// <summary>
 /// Preferencias ligeras del usuario, almacenadas en el dispositivo (constitucion 9).
@@ -13,4 +13,7 @@ public interface ISettingsService
 
     /// <summary>Criterio de orden de la lista: "install" (defecto), "name" o "updated".</summary>
     string SortMode { get; set; }
+
+    /// <summary>Windows: al minimizar, esconderse en el area de notificacion en vez de en la barra.</summary>
+    bool TrayOnMinimize { get; set; }
 }

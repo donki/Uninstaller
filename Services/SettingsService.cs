@@ -1,4 +1,4 @@
-namespace Uninstaller.Services;
+﻿namespace Uninstaller.Services;
 
 /// <inheritdoc cref="ISettingsService"/>
 public class SettingsService : ISettingsService
@@ -17,6 +17,12 @@ public class SettingsService : ISettingsService
     {
         get => Preferences.Get(ShowSystemKey, false);
         set => Preferences.Set(ShowSystemKey, value);
+    }
+
+    public bool TrayOnMinimize
+    {
+        get => Preferences.Get("tray_on_minimize", true);
+        set => Preferences.Set("tray_on_minimize", value);
     }
 
     public string SortMode

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Uninstaller.Pages.AboutPage">
@@ -52,34 +52,6 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Idioma -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Padding="25,20" Spacing="12">
-                    <Label x:Name="LanguageTitle" Style="{StaticResource CardTitle}" />
-
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                        <Button Grid.Column="0"
-                                x:Name="SpanishButton"
-                                Text="🇪🇸 Español"
-                                FontSize="14"
-                                LineBreakMode="WordWrap"
-                                Padding="10,10"
-                                Clicked="OnSpanishClicked" />
-
-                        <Button Grid.Column="1"
-                                x:Name="EnglishButton"
-                                Text="🇺🇸 English"
-                                FontSize="14"
-                                LineBreakMode="WordWrap"
-                                Padding="10,10"
-                                Clicked="OnEnglishClicked" />
-                    </Grid>
-
-                    <Label x:Name="LanguageHint"
-                           Style="{StaticResource HintText}"
-                           HorizontalOptions="Center" />
-                </VerticalStackLayout>
-            </Border>
 
             <!-- Privacidad -->
             <Border Style="{StaticResource Card}">

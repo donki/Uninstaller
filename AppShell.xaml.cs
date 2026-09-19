@@ -23,6 +23,17 @@ public partial class AppShell : Shell
                 catch (Exception) { /* sin la pagina se queda en la lista, que no es grave */ }
             });
         }
+#if DEBUG
+        // Solo en depuracion: «--page settings» abre esa pagina para capturarla sin tocar la interfaz.
+        var args = Environment.GetCommandLineArgs();
+        var page = Array.IndexOf(args, "--page");
+        if (page >= 0 && page + 1 < args.Length)
+        {
+            var route = args[page + 1] == "settings" ? "//SettingsPage" : args[page + 1] == "about" ? "//AboutPage" : null;
+            if (route is not null)
+                Loaded += (_, _) => Dispatcher.Dispatch(async () => { try { await GoToAsync(route); } catch (Exception) { } });
+        }
+#endif
     }
 
     private void ApplyTexts()
@@ -30,6 +41,8 @@ public partial class AppShell : Shell
         HomeLabel.Text = _l["MenuHome"];
         DiskLabel.Text = _l["DiskMenu"];
         DiskItem.IsVisible = DeviceInfo.Platform == DevicePlatform.WinUI;
+        SettingsLabel.Text = _l["SettingsTitle"];
+        SettingsItem.IsVisible = true;
         AboutLabel.Text = _l["About"];
         VersionLabel.Text = $"v{AppInfo.Current.VersionString}";
 
@@ -40,6 +53,8 @@ public partial class AppShell : Shell
                 item.Title = _l["MenuHome"];
             else if (item.Route?.Contains("DiskUsagePage") == true)
                 item.Title = _l["DiskMenu"];
+            else if (item.Route?.Contains("SettingsPage") == true)
+                item.Title = _l["SettingsTitle"];
             else if (item.Route?.Contains("AboutPage") == true)
                 item.Title = _l["About"];
         }
@@ -48,6 +63,8 @@ public partial class AppShell : Shell
     private async void OnHomeTapped(object sender, TappedEventArgs e) => await NavigateAsync("//MainPage");
 
     private async void OnDiskTapped(object sender, TappedEventArgs e) => await NavigateAsync("//DiskUsagePage");
+
+    private async void OnSettingsTapped(object sender, TappedEventArgs e) => await NavigateAsync("//SettingsPage");
 
     private async void OnAboutTapped(object sender, TappedEventArgs e) => await NavigateAsync("//AboutPage");
 

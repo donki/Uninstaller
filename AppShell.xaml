@@ -50,6 +50,14 @@
                     <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnDiskTapped" /></Grid.GestureRecognizers>
                 </Grid>
 
+                <!-- Ajustes: idioma y, en Windows, bandeja y arranque. -->
+                <Grid x:Name="SettingsItem" ColumnDefinitions="26,*" Padding="20,0" HeightRequest="52" ColumnSpacing="16">
+                    <Image Grid.Column="0" Source="ic_settings.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
+                    <Label Grid.Column="1" x:Name="SettingsLabel" VerticalOptions="Center" FontSize="16"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnSettingsTapped" /></Grid.GestureRecognizers>
+                </Grid>
+
                 <!-- Acerca de -->
                 <Grid ColumnDefinitions="26,*" Padding="20,0" HeightRequest="52" ColumnSpacing="16">
                     <Image Grid.Column="0" Source="ic_info.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
@@ -80,6 +88,9 @@
     </FlyoutItem>
     <FlyoutItem Title="Espacio en disco" Icon="ic_disk.png">
         <ShellContent ContentTemplate="{DataTemplate pages:DiskUsagePage}" Route="DiskUsagePage" />
+    </FlyoutItem>
+    <FlyoutItem Title="Ajustes" Icon="ic_settings.png">
+        <ShellContent ContentTemplate="{DataTemplate pages:SettingsPage}" Route="SettingsPage" />
     </FlyoutItem>
     <FlyoutItem Title="Acerca de" Icon="ic_info.png">
         <ShellContent ContentTemplate="{DataTemplate pages:AboutPage}" Route="AboutPage" />

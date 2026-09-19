@@ -2,6 +2,16 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.07 — Pantalla de Ajustes: idioma, bandeja y arranque con Windows
+
+`versionCode`: 2026091907 · Windows `2026.9.19.7`
+
+- **Ajustes** nuevo en el menú, en todas las plataformas. El idioma se cambia aquí (antes estaba
+  en «Acerca de»).
+- En Windows, dos interruptores: **quedarse en el área de notificación al minimizar** (se puede
+  apagar para que minimice como siempre) y **arrancar con Windows** (entrada en `HKCU\…\Run`
+  con `--tray`: arranca escondida en la bandeja).
+
 ## 2026.09.19.06 — Se puede anclar a la barra de tareas
 
 `versionCode`: 2026091906 · Windows `2026.9.19.6`

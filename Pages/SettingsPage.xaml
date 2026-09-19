@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Uninstaller.Pages.SettingsPage">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="12" Spacing="10" MaximumWidthRequest="760" HorizontalOptions="Fill">
+
+            <!-- Idioma -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="16,12" Spacing="10">
+                    <Label x:Name="LanguageTitle" Style="{StaticResource CardTitle}" FontSize="15" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button Grid.Column="0" x:Name="SpanishButton" Text="🇪🇸 Español" FontSize="14" Padding="10,10" Clicked="OnSpanishClicked" />
+                        <Button Grid.Column="1" x:Name="EnglishButton" Text="🇺🇸 English" FontSize="14" Padding="10,10" Clicked="OnEnglishClicked" />
+                    </Grid>
+                    <Label x:Name="LanguageHint" Style="{StaticResource HintText}" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Windows: bandeja y arranque -->
+            <Border x:Name="WindowsCard" Style="{StaticResource Card}">
+                <VerticalStackLayout Padding="16,12" Spacing="10">
+                    <Label x:Name="WindowsTitle" Style="{StaticResource CardTitle}" FontSize="15" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label x:Name="TrayLabel" Style="{StaticResource BodyText}" />
+                            <Label x:Name="TrayHint" Style="{StaticResource HintText}" FontSize="11" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="TraySwitch" OnColor="{StaticResource Primary}" Toggled="OnTrayToggled" VerticalOptions="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label x:Name="StartupLabel" Style="{StaticResource BodyText}" />
+                            <Label x:Name="StartupHint" Style="{StaticResource HintText}" FontSize="11" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1" x:Name="StartupSwitch" OnColor="{StaticResource Primary}" Toggled="OnStartupToggled" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

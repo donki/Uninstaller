@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using SocShared;
 using Uninstaller.Helpers;
 using Uninstaller.Services;
@@ -43,9 +43,6 @@ public partial class AboutPage : ContentPage
         ContactHint.Text = _l["AboutContactHint"];
 
 
-        LanguageTitle.Text = $"🌐 {_l["SettingsLanguage"]}";
-        LanguageHint.Text = _l["AboutLanguageHint"];
-        UpdateLanguageButtons();
 
         PrivacyTitle.Text = $"🔒 {_l["AboutPrivacy"]}";
         PrivacyText.Text = _l["AboutPrivacyText"];
@@ -59,32 +56,6 @@ public partial class AboutPage : ContentPage
         WarningText.Text = _l["AboutWarning"];
 
         BackButton.Text = _l["Back"];
-    }
-
-    // Botones de idioma con bandera (constitucion A.9): el activo (es/en) usa el estilo primario
-    // y el otro el de contorno. La eleccion se persiste igual que en Configuracion.
-    private void UpdateLanguageButtons()
-    {
-        var isSpanish = _l.CurrentLanguage == "es";
-        SpanishButton.Style = LookupStyle(isSpanish ? "PrimaryButton" : "OutlineButton");
-        EnglishButton.Style = LookupStyle(isSpanish ? "OutlineButton" : "PrimaryButton");
-    }
-
-    private static Style? LookupStyle(string key)
-        => Application.Current?.Resources.TryGetValue(key, out var s) == true ? s as Style : null;
-
-    private void OnSpanishClicked(object? sender, EventArgs e) => SetLanguage("es");
-
-    private void OnEnglishClicked(object? sender, EventArgs e) => SetLanguage("en");
-
-    private void SetLanguage(string code)
-    {
-        if (code == _l.CurrentLanguage)
-            return;
-
-        _settings.Language = code;
-        _l.SetLanguage(code);
-        ApplyTexts();
     }
 
     private async void OnBackClicked(object? sender, EventArgs e) => await Shell.Current.GoToAsync("//MainPage");

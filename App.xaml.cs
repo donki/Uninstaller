@@ -4,6 +4,9 @@ public partial class App : Application
 {
 #if WINDOWS
     private Platforms.Windows.TrayIcon? _tray;
+
+    /// <summary>El icono de bandeja, para que Ajustes le cambie el comportamiento al vuelo.</summary>
+    public static Platforms.Windows.TrayIcon? Tray { get; private set; }
 #endif
 
     public App()
@@ -43,7 +46,12 @@ public partial class App : Application
             {
                 var loc = Helpers.ServiceHelper.GetRequiredService<Services.ILocalizationService>();
                 var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(native);
-                _tray = new Platforms.Windows.TrayIcon(hwnd, key => loc[key], () => native.Close());
+                var settings = Helpers.ServiceHelper.GetRequiredService<Services.ISettingsService>();
+                _tray = new Platforms.Windows.TrayIcon(hwnd, key => loc[key], () => native.Close()) { MinimizeToTray = settings.TrayOnMinimize };
+                Tray = _tray;
+                // «--tray» (arranque con Windows): escondida en la bandeja desde el principio.
+                if (Environment.GetCommandLineArgs().Contains("--tray"))
+                    native.DispatcherQueue.TryEnqueue(() => _tray.HideToTray());
                 // Sin paquete (exe suelto o lanzador): identidad para la barra de tareas y anclaje al lanzador.
                 if (!IsPackaged())
                     Platforms.Windows.TaskbarIdentity.Apply(hwnd, "sOCratic.sOCUninstaller", "sOC Uninstaller", Environment.GetEnvironmentVariable("SOC_LAUNCHER"));
