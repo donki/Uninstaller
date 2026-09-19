@@ -133,9 +133,12 @@
               IsVisible="False"
               BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
               Opacity="0.92">
-            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12" Padding="32,0">
                 <ActivityIndicator IsRunning="True" WidthRequest="42" HeightRequest="42" />
-                <Label x:Name="LoadingLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" />
+                <Label x:Name="LoadingLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                <!-- Al desinstalar: cual va (n de N) y la barra. -->
+                <ProgressBar x:Name="UninstallProgress" IsVisible="False" WidthRequest="260" ProgressColor="{StaticResource Primary}" />
+                <Label x:Name="UninstallDetail" IsVisible="False" Style="{StaticResource BodyText}" FontAttributes="Bold" HorizontalOptions="Center" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" />
             </VerticalStackLayout>
         </Grid>
 

@@ -96,6 +96,8 @@ public class LocalizationService : ILocalizationService
         // MainPage
         ["AppsTitle"] = "Installed apps",
         ["Loading"] = "Loading apps…",
+        ["Uninstalling"] = "Uninstalling…",
+        ["UninstallingItem"] = "{0} of {1}: {2}",
         ["ShowSystemApps"] = "Show system apps",
         ["Refresh"] = "Refresh",
         ["SearchPlaceholder"] = "Search by name or package",
@@ -193,6 +195,8 @@ public class LocalizationService : ILocalizationService
         // MainPage
         ["AppsTitle"] = "Aplicaciones instaladas",
         ["Loading"] = "Cargando aplicaciones…",
+        ["Uninstalling"] = "Desinstalando…",
+        ["UninstallingItem"] = "{0} de {1}: {2}",
         ["ShowSystemApps"] = "Mostrar apps del sistema",
         ["Refresh"] = "Actualizar",
         ["SearchPlaceholder"] = "Buscar por nombre o paquete",

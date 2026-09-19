@@ -91,6 +91,7 @@ public partial class MainPage : ContentPage
             return;
 
         _isBusy = true;
+        LoadingLabel.Text = _l["Loading"];
         LoadingOverlay.IsVisible = true;
 
         try
@@ -349,9 +350,21 @@ public partial class MainPage : ContentPage
                 _l["Unattended"], _l["WithWizard"]);
         }
 
+        // Progreso a la vista mientras dura: cual va (n de N), su nombre y la barra. Atendido o
+        // desatendido, entre un desinstalador y el siguiente la pantalla no puede quedarse muda.
+        LoadingLabel.Text = _l["Uninstalling"];
+        UninstallProgress.Progress = 0;
+        UninstallProgress.IsVisible = true;
+        UninstallDetail.IsVisible = true;
+        LoadingOverlay.IsVisible = true;
+
         var done = 0;
+        var index = 0;
         foreach (var app in selected)
         {
+            index++;
+            UninstallDetail.Text = string.Format(_l.CurrentCulture, _l["UninstallingItem"], index, selected.Count, app.Label);
+            await UninstallProgress.ProgressTo((index - 1) / (double)selected.Count, 150, Easing.Linear);
             try
             {
                 // Android exige la confirmacion del usuario por cada app (sin borrado masivo silencioso);
@@ -369,6 +382,11 @@ public partial class MainPage : ContentPage
                     _l["Ok"]);
             }
         }
+
+        await UninstallProgress.ProgressTo(1, 150, Easing.Linear);
+        UninstallProgress.IsVisible = false;
+        UninstallDetail.IsVisible = false;
+        LoadingOverlay.IsVisible = false;
 
         // Se refresca la lista al volver para reflejar lo que realmente quedo instalado.
         await LoadAppsAsync();

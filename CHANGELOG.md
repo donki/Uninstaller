@@ -2,6 +2,13 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.02 — Progreso al desinstalar
+
+`versionCode`: 2026091902 · Windows `2026.9.19.2`
+
+- Mientras se desinstala, atendido o desatendido, se ve el progreso: cuál va (n de N), su nombre y
+  la barra. Antes, entre un desinstalador y el siguiente la pantalla se quedaba muda.
+
 ## 2026.09.19.01 — Windows: lo que ocupa cada aplicación
 
 `versionCode`: 2026091901 · Windows `2026.9.19.1`
