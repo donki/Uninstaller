@@ -2,6 +2,15 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.06 — Se puede anclar a la barra de tareas
+
+`versionCode`: 2026091906 · Windows `2026.9.19.6`
+
+- **Anclar a la barra de tareas** no funcionaba: la ventana es del exe interno (en la carpeta
+  versionada de `%LOCALAPPDATA%`) y Windows intentaba anclar ese. Ahora la ventana lleva su
+  identidad (AppUserModelID) y el comando de relanzamiento apunta al lanzador `sOCUninstaller.exe`,
+  que es lo que se ancla y lo que sigue valiendo tras actualizar.
+
 ## 2026.09.19.05 — Espacio en disco: una fila de botones y progreso en las operaciones
 
 `versionCode`: 2026091905 · Windows `2026.9.19.5`

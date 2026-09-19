@@ -11,6 +11,14 @@ public partial class App : Application
         InitializeComponent();
     }
 
+#if WINDOWS
+    private static bool IsPackaged()
+    {
+        try { return global::Windows.ApplicationModel.Package.Current is not null; }
+        catch (Exception) { return false; }
+    }
+#endif
+
     protected override Window CreateWindow(IActivationState? activationState)
     {
 #if WINDOWS
@@ -34,7 +42,11 @@ public partial class App : Application
             if (window.Handler?.PlatformView is Microsoft.UI.Xaml.Window native && _tray is null)
             {
                 var loc = Helpers.ServiceHelper.GetRequiredService<Services.ILocalizationService>();
-                _tray = new Platforms.Windows.TrayIcon(WinRT.Interop.WindowNative.GetWindowHandle(native), key => loc[key], () => native.Close());
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(native);
+                _tray = new Platforms.Windows.TrayIcon(hwnd, key => loc[key], () => native.Close());
+                // Sin paquete (exe suelto o lanzador): identidad para la barra de tareas y anclaje al lanzador.
+                if (!IsPackaged())
+                    Platforms.Windows.TaskbarIdentity.Apply(hwnd, "sOCratic.sOCUninstaller", "sOC Uninstaller", Environment.GetEnvironmentVariable("SOC_LAUNCHER"));
             }
         };
 #endif

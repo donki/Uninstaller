@@ -7,7 +7,7 @@
 
   <!-- Identidad de Partner Center (cuenta sOCratic). El nombre de identidad y el DisplayName se
        confirman al reservar el nombre; la version la pone tools\empaquetar-msix.ps1. -->
-  <Identity Name="sOCratic.sOCUninstaller" Publisher="CN=2FC3763A-58D5-473A-840E-D47726B23FE3" Version="2026.9.1905.0" />
+  <Identity Name="sOCratic.sOCUninstaller" Publisher="CN=2FC3763A-58D5-473A-840E-D47726B23FE3" Version="2026.9.1906.0" />
 
   <mp:PhoneIdentity xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" PhoneProductId="7C2D1A9E-5B44-4F0A-9E61-2B8C3D5F7A10" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

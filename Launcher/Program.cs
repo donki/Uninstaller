@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 
@@ -25,6 +25,8 @@ internal static class Program
                 Unpack(assembly, root, target);
 
             var info = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = target };
+            // Para que la ventana se pueda anclar a la barra de tareas apuntando a ESTE exe.
+            info.Environment["SOC_LAUNCHER"] = Environment.ProcessPath ?? string.Empty;
             foreach (var a in args)
                 info.ArgumentList.Add(a);
             Process.Start(info);
