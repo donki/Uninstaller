@@ -21,6 +21,7 @@ public partial class App : Application
         var disk = Array.IndexOf(args, "--disk");
         if (disk >= 0)
             Pages.DiskUsagePage.PendingPath = disk + 1 < args.Length && !args[disk + 1].StartsWith("--") ? args[disk + 1] : string.Empty;
+        Pages.DiskUsagePage.PendingMap = args.Contains("--map");   // y directo al mapa de rectangulos
 #endif
         var window = new Window(new AppShell()) { Title = "sOC Uninstaller" };
 #if WINDOWS

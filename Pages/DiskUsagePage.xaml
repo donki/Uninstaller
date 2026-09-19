@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:models="clr-namespace:Uninstaller.Models"
@@ -27,8 +27,9 @@
                 <ProgressBar x:Name="ScanProgress" IsVisible="False" ProgressColor="{StaticResource Primary}" />
 
                 <!-- Vistas: arbol, ficheros grandes, tipos, antigüedad, duplicados. -->
-                <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
+                <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="6">
                     <Button Grid.Column="0" x:Name="TreeButton" Style="{StaticResource IconButton}" ImageSource="ic_tree.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="5" x:Name="MapButton" Style="{StaticResource IconButton}" ImageSource="ic_treemap.png" Clicked="OnViewClicked" />
                     <Button Grid.Column="1" x:Name="LargestButton" Style="{StaticResource IconButton}" ImageSource="ic_biggest.png" Clicked="OnViewClicked" />
                     <Button Grid.Column="2" x:Name="TypesButton" Style="{StaticResource IconButton}" ImageSource="ic_types.png" Clicked="OnViewClicked" />
                     <Button Grid.Column="3" x:Name="AgeButton" Style="{StaticResource IconButton}" ImageSource="ic_clock.png" Clicked="OnViewClicked" />
@@ -37,7 +38,8 @@
 
                 <!-- Acciones sobre lo seleccionado: abrir en el Explorador, copiar ruta, papelera;
                      y exportar la vista a CSV. -->
-                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
+                <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
+                    <Button Grid.Column="4" x:Name="UpButton" Style="{StaticResource IconButton}" ImageSource="ic_up.png" Clicked="OnUpClicked" IsEnabled="False" />
                     <Button Grid.Column="0" x:Name="OpenButton" Style="{StaticResource IconButton}" ImageSource="ic_open.png" Clicked="OnOpenClicked" IsEnabled="False" />
                     <Button Grid.Column="1" x:Name="CopyButton" Style="{StaticResource IconButton}" ImageSource="ic_copy_path.png" Clicked="OnCopyClicked" IsEnabled="False" />
                     <Button Grid.Column="2" x:Name="DeleteButton" Style="{StaticResource IconButton}" ImageSource="ic_trash.png" BorderColor="#D14343" Clicked="OnDeleteClicked" IsEnabled="False" />
@@ -71,6 +73,19 @@
                 <Label x:Name="EmptyLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" Padding="30" />
             </CollectionView.EmptyView>
         </CollectionView>
+
+        <!-- Mapa de rectangulos (treemap): un toque elige la carpeta, dos entran en ella; la flecha sube. -->
+        <Border Grid.Row="1" x:Name="MapPanel" Style="{StaticResource Card}" Margin="12,6,12,12" Padding="4" IsVisible="False">
+            <Grid RowDefinitions="Auto,*">
+                <Label Grid.Row="0" x:Name="MapLabel" Style="{StaticResource HintText}" Padding="8,4" LineBreakMode="MiddleTruncation" />
+                <GraphicsView Grid.Row="1" x:Name="MapView">
+                    <GraphicsView.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnMapTapped" NumberOfTapsRequired="1" />
+                        <TapGestureRecognizer Tapped="OnMapDoubleTapped" NumberOfTapsRequired="2" />
+                    </GraphicsView.GestureRecognizers>
+                </GraphicsView>
+            </Grid>
+        </Border>
 
         <!-- Ficheros mas grandes -->
         <CollectionView Grid.Row="1" x:Name="LargestList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged" IsVisible="False">

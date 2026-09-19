@@ -2,6 +2,16 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.04 — Espacio en disco: mapa de rectángulos
+
+`versionCode`: 2026091904 · Windows `2026.9.19.4`
+
+- **Mapa de rectángulos** (treemap) en Espacio en disco: cada carpeta es un rectángulo proporcional
+  a su tamaño, con sus subcarpetas dentro (reparto «squarified», que las deja lo más cuadradas
+  posible). Un toque elige la carpeta (y valen los botones de Explorador, copiar ruta y papelera),
+  dos toques entran en ella y la flecha sube un nivel. `--map` junto a `--disk` abre directamente
+  el mapa.
+
 ## 2026.09.19.03 — Espacio en disco (estilo TreeSize), en Windows
 
 `versionCode`: 2026091903 · Windows `2026.9.19.3`

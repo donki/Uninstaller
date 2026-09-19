@@ -16,7 +16,7 @@ namespace Uninstaller.Pages;
 /// </summary>
 public partial class DiskUsagePage : ContentPage
 {
-    private enum ViewMode { Tree, Largest, Types, Age, Duplicates }
+    private enum ViewMode { Tree, Largest, Types, Age, Duplicates, Map }
 
     private readonly ILocalizationService _l;
     private readonly IShellActions _shell;
@@ -28,9 +28,15 @@ public partial class DiskUsagePage : ContentPage
     private List<DuplicateGroup>? _duplicates;
     private readonly ObservableCollection<FolderNode> _rows = [];
     private FileRow? _selectedDuplicate;
+    private readonly TreemapDrawable _map = new();
+    private FolderNode? _mapRoot;
+    private FolderNode? _mapSelected;
 
     /// <summary>Ruta que llega por linea de ordenes (--disk ruta): se escanea al abrir la pagina. Vacia = solo abrir.</summary>
     public static string? PendingPath { get; set; }
+
+    /// <summary>Con --map: la primera vista es el mapa de rectangulos.</summary>
+    public static bool PendingMap { get; set; }
 
     public DiskUsagePage()
     {
@@ -39,6 +45,8 @@ public partial class DiskUsagePage : ContentPage
         _shell = ServiceHelper.GetRequiredService<IShellActions>();
         _toast = ServiceHelper.GetRequiredService<IToastService>();
         TreeList.ItemsSource = _rows;
+        _map.FormatSize = FormatSize;
+        MapView.Drawable = _map;
         _l.LanguageChanged += (_, _) => ApplyTexts();
         ApplyTexts();
         LoadDrives();
@@ -49,6 +57,8 @@ public partial class DiskUsagePage : ContentPage
                 return;
             PendingPath = null;
             PathEntry.Text = pending;
+            if (PendingMap)
+                _mode = ViewMode.Map;
             OnScanClicked(this, EventArgs.Empty);
         };
     }
@@ -61,8 +71,8 @@ public partial class DiskUsagePage : ContentPage
         if (_root is null)
             StatusLabel.Text = _l["DiskHint"];
         foreach (var (button, key) in new[] { (ScanButton, "DiskScan"), (StopButton, "DiskStop"), (TreeButton, "DiskTree"), (LargestButton, "DiskLargest"),
-                     (TypesButton, "DiskTypes"), (AgeButton, "DiskAge"), (DuplicatesButton, "DiskDuplicates"), (OpenButton, "DiskOpen"),
-                     (CopyButton, "DiskCopy"), (DeleteButton, "DiskDelete"), (ExportButton, "DiskExport") })
+                     (TypesButton, "DiskTypes"), (AgeButton, "DiskAge"), (DuplicatesButton, "DiskDuplicates"), (MapButton, "DiskMap"), (OpenButton, "DiskOpen"),
+                     (CopyButton, "DiskCopy"), (DeleteButton, "DiskDelete"), (ExportButton, "DiskExport"), (UpButton, "DiskUp") })
         {
             SemanticProperties.SetDescription(button, _l[key]);
             ToolTipProperties.SetText(button, _l[key]);
@@ -102,6 +112,8 @@ public partial class DiskUsagePage : ContentPage
         ScanProgress.Progress = 0;
         _root = null;
         _duplicates = null;
+        _mapRoot = null;
+        _mapSelected = null;
         _rows.Clear();
         LargestList.ItemsSource = null;
         AggregateList.ItemsSource = null;
@@ -220,6 +232,7 @@ public partial class DiskUsagePage : ContentPage
             : ReferenceEquals(sender, TypesButton) ? ViewMode.Types
             : ReferenceEquals(sender, AgeButton) ? ViewMode.Age
             : ReferenceEquals(sender, DuplicatesButton) ? ViewMode.Duplicates
+            : ReferenceEquals(sender, MapButton) ? ViewMode.Map
             : ViewMode.Tree;
         if (mode == ViewMode.Duplicates && _root is not null && _duplicates is null)
             await FindDuplicatesAsync();
@@ -245,9 +258,15 @@ public partial class DiskUsagePage : ContentPage
                 case ViewMode.Duplicates:
                     DuplicatesList.ItemsSource = _duplicates;
                     break;
+                case ViewMode.Map:
+                    _mapRoot ??= _root;
+                    RedrawMap();
+                    break;
             }
         }
         TreeList.IsVisible = mode == ViewMode.Tree;
+        MapPanel.IsVisible = mode == ViewMode.Map;
+        UpButton.IsVisible = mode == ViewMode.Map;
         LargestList.IsVisible = mode == ViewMode.Largest;
         AggregateList.IsVisible = mode is ViewMode.Types or ViewMode.Age;
         DuplicatesList.IsVisible = mode == ViewMode.Duplicates;
@@ -259,7 +278,8 @@ public partial class DiskUsagePage : ContentPage
     {
         var primary = (Color)Application.Current!.Resources["Primary"];
         foreach (var (button, mode, icon) in new[] { (TreeButton, ViewMode.Tree, "ic_tree"), (LargestButton, ViewMode.Largest, "ic_biggest"),
-                     (TypesButton, ViewMode.Types, "ic_types"), (AgeButton, ViewMode.Age, "ic_clock"), (DuplicatesButton, ViewMode.Duplicates, "ic_duplicates") })
+                     (TypesButton, ViewMode.Types, "ic_types"), (AgeButton, ViewMode.Age, "ic_clock"), (DuplicatesButton, ViewMode.Duplicates, "ic_duplicates"),
+                     (MapButton, ViewMode.Map, "ic_treemap") })
         {
             var on = mode == _mode;
             button.BackgroundColor = on ? primary : Colors.Transparent;
@@ -364,6 +384,53 @@ public partial class DiskUsagePage : ContentPage
         }
     }
 
+    // ------------------------------------------------------------------ mapa
+
+    private void RedrawMap()
+    {
+        _map.Root = _mapRoot;
+        _map.Selected = _mapSelected;
+        _map.Dark = Application.Current?.RequestedTheme == AppTheme.Dark;
+        MapLabel.Text = _mapRoot is null ? string.Empty
+            : _mapSelected is null || ReferenceEquals(_mapSelected, _mapRoot)
+                ? $"{_mapRoot.FullPath} · {FormatSize(_mapRoot.Size)}"
+                : $"{_mapSelected.FullPath} · {FormatSize(_mapSelected.Size)} · {(_mapSelected.Percent * 100).ToString("0.#", _l.CurrentCulture)} %";
+        MapView.Invalidate();
+        UpButton.IsEnabled = _mapRoot?.Parent is not null;
+    }
+
+    private void OnMapTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.GetPosition(MapView) is not { } p)
+            return;
+        _mapSelected = _map.HitTest(new PointF((float)p.X, (float)p.Y));
+        RedrawMap();
+        UpdateActions();
+    }
+
+    private void OnMapDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.GetPosition(MapView) is not { } p)
+            return;
+        var hit = _map.HitTest(new PointF((float)p.X, (float)p.Y));
+        if (hit is null || !hit.HasChildren)
+            return;
+        _mapRoot = hit;
+        _mapSelected = null;
+        RedrawMap();
+        UpdateActions();
+    }
+
+    private void OnUpClicked(object? sender, EventArgs e)
+    {
+        if (_mapRoot?.Parent is null)
+            return;
+        _mapSelected = _mapRoot;
+        _mapRoot = _mapRoot.Parent;
+        RedrawMap();
+        UpdateActions();
+    }
+
     // ------------------------------------------------------------------ seleccion y acciones
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e) => UpdateActions();
@@ -385,6 +452,7 @@ public partial class DiskUsagePage : ContentPage
         ViewMode.Tree => (TreeList.SelectedItem as FolderNode)?.FullPath,
         ViewMode.Largest => (LargestList.SelectedItem as FileRow)?.FullPath,
         ViewMode.Duplicates => _selectedDuplicate?.FullPath,
+        ViewMode.Map => (_mapSelected ?? _mapRoot)?.FullPath,
         _ => null,
     };
 
@@ -394,7 +462,8 @@ public partial class DiskUsagePage : ContentPage
         OpenButton.IsEnabled = has;
         CopyButton.IsEnabled = has;
         // La raiz escaneada no se manda a la papelera desde aqui.
-        DeleteButton.IsEnabled = has && !(_mode == ViewMode.Tree && ReferenceEquals(TreeList.SelectedItem, _root));
+        DeleteButton.IsEnabled = has && !(_mode == ViewMode.Tree && ReferenceEquals(TreeList.SelectedItem, _root))
+                                     && !(_mode == ViewMode.Map && ReferenceEquals(_mapSelected ?? _mapRoot, _root));
         ExportButton.IsEnabled = _root is not null && _scan is null;
     }
 
@@ -468,6 +537,9 @@ public partial class DiskUsagePage : ContentPage
         LargestList.ItemsSource = null;
         _duplicates = null;
         _selectedDuplicate = null;
+        if (_mapRoot is not null && FindNode(_root, _mapRoot.FullPath) is null)
+            _mapRoot = _root;
+        _mapSelected = null;
         ShowView(_mode == ViewMode.Duplicates ? ViewMode.Tree : _mode);
     }
 
