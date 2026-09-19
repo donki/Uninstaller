@@ -28,9 +28,11 @@ public static class MauiProgram
 #if ANDROID
         builder.Services.AddSingleton<IAppInventoryService, Platforms.Android.AppInventoryService>();
         builder.Services.AddSingleton<IToastService, Platforms.Android.ToastService>();
+        builder.Services.AddSingleton<IShellActions, Platforms.Android.ShellActions>();
 #elif WINDOWS
         builder.Services.AddSingleton<IAppInventoryService, Platforms.Windows.AppInventoryService>();
         builder.Services.AddSingleton<IToastService, Platforms.Windows.ToastService>();
+        builder.Services.AddSingleton<IShellActions, Platforms.Windows.ShellActions>();
 #endif
 
         // Las paginas (carpeta Pages) las instancia el Shell por DataTemplate y resuelven sus

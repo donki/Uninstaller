@@ -35,6 +35,9 @@ public partial class MainPage : ContentPage
         _toast = ServiceHelper.GetRequiredService<IToastService>();
         _update = ServiceHelper.GetRequiredService<UpdateService>();
 #if WINDOWS
+        // Espacio en disco: solo en Windows (en Android haria falta el permiso de todo el almacenamiento).
+        HeaderButtons.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        DiskButton.IsVisible = true;
         // El «toast» de Windows lo pinta la propia pagina: una franja que se esconde a los tres segundos.
         Platforms.Windows.ToastService.ToastRequested += async message =>
         {
@@ -77,6 +80,8 @@ public partial class MainPage : ContentPage
         SemanticProperties.SetDescription(SelectAllButton, _l["SelectAll"]);
         SemanticProperties.SetDescription(ClearButton, _l["DeselectAll"]);
         SemanticProperties.SetDescription(ShowSystemButton, _l["ShowSystemApps"]);
+        SemanticProperties.SetDescription(DiskButton, _l["DiskTitle"]);
+        ToolTipProperties.SetText(DiskButton, _l["DiskTitle"]);
         SearchEntry.Placeholder = _l["SearchPlaceholder"];
         EmptyLabel.Text = _l["EmptyList"];
         EmptyHintLabel.Text = _l["EmptyListHint"];
@@ -316,6 +321,8 @@ public partial class MainPage : ContentPage
     }
 
     private async void OnRefreshClicked(object? sender, EventArgs e) => await LoadAppsAsync();
+
+    private async void OnDiskClicked(object? sender, EventArgs e) => await Shell.Current.GoToAsync("//DiskUsagePage");
 
     private async void OnRefreshing(object? sender, EventArgs e) => await LoadAppsAsync();
 

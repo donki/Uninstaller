@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Uninstaller.Models"
+             x:Class="Uninstaller.Pages.DiskUsagePage">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Cabecera: que escanear, estado del escaneo, vistas y acciones. Solo iconos, como el
+             resto de la aplicacion (constitucion). -->
+        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="12,12,12,6">
+            <VerticalStackLayout Padding="16,12" Spacing="10">
+
+                <!-- Unidad o ruta (tambien \\servidor\recurso), escanear y parar. -->
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                    <Picker Grid.Column="0" x:Name="DrivePicker" MinimumWidthRequest="150"
+                            SelectedIndexChanged="OnDriveChanged" />
+                    <Entry Grid.Column="1" x:Name="PathEntry" ReturnType="Go" Completed="OnScanClicked" />
+                    <Button Grid.Column="2" x:Name="ScanButton" Style="{StaticResource IconButton}"
+                            ImageSource="ic_play.png" Clicked="OnScanClicked" />
+                    <Button Grid.Column="3" x:Name="StopButton" Style="{StaticResource IconButton}"
+                            ImageSource="ic_stop.png" Clicked="OnStopClicked" IsEnabled="False" />
+                </Grid>
+
+                <!-- Estado: lo escaneado hasta ahora (o el resumen final). -->
+                <Label x:Name="StatusLabel" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                <ProgressBar x:Name="ScanProgress" IsVisible="False" ProgressColor="{StaticResource Primary}" />
+
+                <!-- Vistas: arbol, ficheros grandes, tipos, antigüedad, duplicados. -->
+                <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6">
+                    <Button Grid.Column="0" x:Name="TreeButton" Style="{StaticResource IconButton}" ImageSource="ic_tree.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="1" x:Name="LargestButton" Style="{StaticResource IconButton}" ImageSource="ic_biggest.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="2" x:Name="TypesButton" Style="{StaticResource IconButton}" ImageSource="ic_types.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="3" x:Name="AgeButton" Style="{StaticResource IconButton}" ImageSource="ic_clock.png" Clicked="OnViewClicked" />
+                    <Button Grid.Column="4" x:Name="DuplicatesButton" Style="{StaticResource IconButton}" ImageSource="ic_duplicates.png" Clicked="OnViewClicked" />
+                </Grid>
+
+                <!-- Acciones sobre lo seleccionado: abrir en el Explorador, copiar ruta, papelera;
+                     y exportar la vista a CSV. -->
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
+                    <Button Grid.Column="0" x:Name="OpenButton" Style="{StaticResource IconButton}" ImageSource="ic_open.png" Clicked="OnOpenClicked" IsEnabled="False" />
+                    <Button Grid.Column="1" x:Name="CopyButton" Style="{StaticResource IconButton}" ImageSource="ic_copy_path.png" Clicked="OnCopyClicked" IsEnabled="False" />
+                    <Button Grid.Column="2" x:Name="DeleteButton" Style="{StaticResource IconButton}" ImageSource="ic_trash.png" BorderColor="#D14343" Clicked="OnDeleteClicked" IsEnabled="False" />
+                    <Button Grid.Column="3" x:Name="ExportButton" Style="{StaticResource IconButton}" ImageSource="ic_export.png" Clicked="OnExportClicked" IsEnabled="False" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Arbol de carpetas, aplanado: sangria por profundidad y desplegable por fila. -->
+        <CollectionView Grid.Row="1" x:Name="TreeList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:FolderNode">
+                    <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="10,8" Margin="{Binding Indent}">
+                            <Label Grid.Column="0" Text="{Binding Expander}" Style="{StaticResource BodyText}" WidthRequest="18" VerticalOptions="Center" HorizontalTextAlignment="Center">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnExpanderTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                            <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                <Label Text="{Binding Name}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                                <ProgressBar Progress="{Binding Percent}" ProgressColor="{StaticResource Primary}" HeightRequest="4" />
+                                <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" LineBreakMode="TailTruncation" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="{Binding SizeText}" Style="{StaticResource BodyText}" FontAttributes="Bold" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.EmptyView>
+                <Label x:Name="EmptyLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" Padding="30" />
+            </CollectionView.EmptyView>
+        </CollectionView>
+
+        <!-- Ficheros mas grandes -->
+        <CollectionView Grid.Row="1" x:Name="LargestList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged" IsVisible="False">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:FileRow">
+                    <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,8">
+                            <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                <Label Text="{Binding Name}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                                <Label Text="{Binding Folder}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                                <ProgressBar Progress="{Binding Percent}" ProgressColor="{StaticResource Primary}" HeightRequest="4" />
+                                <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1" Text="{Binding SizeText}" Style="{StaticResource BodyText}" FontAttributes="Bold" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Tipos de fichero y antigüedad: filas agregadas. -->
+        <CollectionView Grid.Row="1" x:Name="AggregateList" Margin="12,6,12,12" SelectionMode="None" IsVisible="False">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:AggregateRow">
+                    <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,8">
+                            <VerticalStackLayout Grid.Column="0" Spacing="3">
+                                <Label Text="{Binding Label}" Style="{StaticResource BodyText}" FontAttributes="Bold" />
+                                <ProgressBar Progress="{Binding Percent}" ProgressColor="{StaticResource Primary}" HeightRequest="4" />
+                                <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1" Text="{Binding SizeText}" Style="{StaticResource BodyText}" FontAttributes="Bold" VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Duplicados: un grupo por tarjeta, con sus copias dentro (cada copia se puede elegir). -->
+        <CollectionView Grid.Row="1" x:Name="DuplicatesList" Margin="12,6,12,12" SelectionMode="None" IsVisible="False">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:DuplicateGroup">
+                    <Border Style="{StaticResource Card}" Margin="0,3" Padding="12,8">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Title}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                            <Label Text="{Binding Detail}" Style="{StaticResource HintText}" />
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="0">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:FileRow">
+                                        <Grid Padding="8,5" ColumnDefinitions="*,Auto" BackgroundColor="{Binding RowColor}">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer Tapped="OnDuplicateRowTapped" />
+                                            </Grid.GestureRecognizers>
+                                            <Label Grid.Column="0" Text="{Binding FullPath}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                                            <Label Grid.Column="1" Text="{Binding DetailText}" Style="{StaticResource HintText}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+
+</ContentPage>

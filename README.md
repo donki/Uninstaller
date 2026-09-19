@@ -26,6 +26,11 @@ en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
   También uno detrás de otro. Antes de empezar pregunta si hacerlo **desatendido** (sin preguntas)
   donde el instalador lo admite: Windows Installer, Inno Setup, NSIS, `QuietUninstallString` y
   apps de la Store. Al minimizar se va a la bandeja.
+- **Espacio en disco** (Windows, `Pages/DiskUsagePage` + `Services/DiskScanner`): estilo TreeSize.
+  Árbol de carpetas con tamaños, ficheros más grandes, por tipo, por antigüedad y duplicados
+  (tamaño + SHA-256 parcial y entero); unidades locales, de red y rutas UNC; ver en el Explorador,
+  copiar ruta, papelera (`SHFileOperation` con deshacer) y exportar a CSV. `--disk [ruta]` la abre
+  directamente. En Android no se enseña (haría falta `MANAGE_EXTERNAL_STORAGE`).
 - **Paquetes Windows** (`tools\publicar-windows.ps1 -Msix`): `sOCUninstaller.exe`, un solo fichero
   (lanzador que lleva la app WinUI comprimida dentro y la desempaqueta en
   `%LOCALAPPDATA%\sOCUninstaller\app\<versión>`, porque WinUI no admite el single-file de .NET),

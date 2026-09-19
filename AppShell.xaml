@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
        xmlns:pages="clr-namespace:Uninstaller.Pages"
@@ -41,6 +41,15 @@
                     <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnHomeTapped" /></Grid.GestureRecognizers>
                 </Grid>
 
+                <!-- Espacio en disco (estilo TreeSize). Solo en Windows: en Android haria falta el
+                     permiso de todo el almacenamiento, que Play no da para esto. -->
+                <Grid x:Name="DiskItem" ColumnDefinitions="26,*" Padding="20,0" HeightRequest="52" ColumnSpacing="16" IsVisible="False">
+                    <Image Grid.Column="0" Source="ic_disk.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
+                    <Label Grid.Column="1" x:Name="DiskLabel" VerticalOptions="Center" FontSize="16"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+                    <Grid.GestureRecognizers><TapGestureRecognizer Tapped="OnDiskTapped" /></Grid.GestureRecognizers>
+                </Grid>
+
                 <!-- Acerca de -->
                 <Grid ColumnDefinitions="26,*" Padding="20,0" HeightRequest="52" ColumnSpacing="16">
                     <Image Grid.Column="0" Source="ic_info.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
@@ -68,6 +77,9 @@
     <!-- Estructura de navegacion (rutas). El menu visual lo pinta FlyoutContent. -->
     <FlyoutItem Title="Inicio" Icon="ic_home.png">
         <ShellContent ContentTemplate="{DataTemplate pages:MainPage}" Route="MainPage" />
+    </FlyoutItem>
+    <FlyoutItem Title="Espacio en disco" Icon="ic_disk.png">
+        <ShellContent ContentTemplate="{DataTemplate pages:DiskUsagePage}" Route="DiskUsagePage" />
     </FlyoutItem>
     <FlyoutItem Title="Acerca de" Icon="ic_info.png">
         <ShellContent ContentTemplate="{DataTemplate pages:AboutPage}" Route="AboutPage" />

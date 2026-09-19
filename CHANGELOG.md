@@ -2,6 +2,22 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.19.03 — Espacio en disco (estilo TreeSize), en Windows
+
+`versionCode`: 2026091903 · Windows `2026.9.19.3`
+
+- **Espacio en disco**: botón nuevo en la cabecera (y entrada en el menú), solo en Windows. Se
+  escanea una unidad, una carpeta o una ruta de red (`\\servidor\recurso`) y se ve el **árbol de
+  carpetas** con lo que ocupa cada una (tamaño, porcentaje del padre, ficheros, carpetas, última
+  modificación), desplegable por fila; los **ficheros más grandes**; el reparto **por tipo de
+  fichero** y **por antigüedad**; y los **ficheros duplicados** (mismo tamaño y mismo hash: primero
+  los primeros 64 KB y después el fichero entero), con lo que se recuperaría dejando una copia.
+- Sobre lo elegido: **ver en el Explorador**, **copiar la ruta** y **enviar a la papelera** (con
+  deshacer; el árbol se actualiza sin volver a escanear). **Exportar** la vista a CSV en Documentos.
+- Escaneo en paralelo y cancelable, con progreso; los enlaces simbólicos y puntos de unión no se
+  siguen; las carpetas sin permiso se marcan y se sigue. `sOCUninstaller.exe --disk [ruta]` abre la
+  utilidad directamente (y escanea la ruta si se da).
+
 ## 2026.09.19.02 — Progreso al desinstalar
 
 `versionCode`: 2026091902 · Windows `2026.9.19.2`

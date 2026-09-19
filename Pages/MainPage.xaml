@@ -23,7 +23,7 @@
                     </Label.GestureRecognizers>
                 </Label>
 
-                <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="6">
+                <Grid x:Name="HeaderButtons" ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="6">
                     <Button Grid.Column="0"
                             x:Name="SortButton"
                             Style="{StaticResource IconButton}"
@@ -55,6 +55,13 @@
                             Style="{StaticResource IconButton}"
                             ImageSource="ic_system.png"
                             Clicked="OnShowSystemClicked" />
+                    <!-- Espacio en disco (estilo TreeSize), solo en Windows: la columna se añade en el code-behind. -->
+                    <Button Grid.Column="6"
+                            x:Name="DiskButton"
+                            Style="{StaticResource IconButton}"
+                            ImageSource="ic_disk.png"
+                            Clicked="OnDiskClicked"
+                            IsVisible="False" />
                 </Grid>
 
                 <!-- Buscador: con cien aplicaciones instaladas, desplazarse hasta la que se
