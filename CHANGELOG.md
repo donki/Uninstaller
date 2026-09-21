@@ -1,7 +1,15 @@
-﻿# Changelog
+# Changelog
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.21.00 — Arreglo: enviar a la papelera cerraba la aplicación
+
+`versionCode`: 2026092100 · Windows `2026.9.21.0`
+
+- **Espacio en disco › Enviar a la papelera** hacía saltar la aplicación al aceptar. La estructura
+  que se pasa a `SHFileOperation` iba empaquetada (`Pack = 1`), que solo es correcto en 32 bits: en
+  x64 shell32 leía los punteros desplazados. Además, la llamada se hacía desde un hilo del pool
+  (MTA) y el shell quiere STA. Ahora va sin empaquetar y en un hilo STA propio.
 ## 2026.09.19.07 — Pantalla de Ajustes: idioma, bandeja y arranque con Windows
 
 `versionCode`: 2026091907 · Windows `2026.9.19.7`

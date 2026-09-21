@@ -37,19 +37,41 @@ public class ShellActions : IShellActions
     }
 
     /// <summary>SHFileOperation con FOF_ALLOWUNDO: a la papelera, como desde el Explorador.</summary>
+    /// <remarks>
+    /// Dos trampas que hacian reventar la aplicacion: la estructura SHFILEOPSTRUCT solo va
+    /// empaquetada (Pack = 1) en 32 bits; en x64 lleva el relleno normal, y con Pack = 1 shell32
+    /// leia los punteros desplazados. Y el shell quiere un hilo STA: se le da uno propio en vez del
+    /// del pool (MTA) desde el que llama la pagina.
+    /// </remarks>
     public bool MoveToRecycleBin(string path)
     {
-        var op = new SHFILEOPSTRUCT
+        var ok = false;
+        var thread = new Thread(() =>
         {
-            wFunc = 3,                              // FO_DELETE
-            pFrom = path + "\0\0",
-            fFlags = 0x0040 | 0x0010,               // FOF_ALLOWUNDO | FOF_NOCONFIRMATION (con el dialogo de progreso de Windows)
-        };
-        var result = SHFileOperation(ref op);
-        return result == 0 && !op.fAnyOperationsAborted;
+            try
+            {
+                var op = new SHFILEOPSTRUCT
+                {
+                    wFunc = 3,                              // FO_DELETE
+                    pFrom = path + "\0\0",
+                    fFlags = 0x0040 | 0x0010,               // FOF_ALLOWUNDO | FOF_NOCONFIRMATION (con el dialogo de progreso de Windows)
+                };
+                var result = SHFileOperation(ref op);
+                ok = result == 0 && !op.fAnyOperationsAborted;
+            }
+            catch (Exception)
+            {
+                ok = false;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        return ok;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
+    // Sin Pack: en x64 la estructura lleva el relleno por defecto (solo en x86 va con Pack = 1).
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEOPSTRUCT
     {
         public IntPtr hwnd;
