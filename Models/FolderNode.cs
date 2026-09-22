@@ -56,6 +56,19 @@ public sealed class FolderNode : INotifyPropertyChanged
     /// <summary>Glifo del desplegable: vacio si no hay subcarpetas.</summary>
     public string Expander => !HasChildren ? string.Empty : IsExpanded ? "▾" : "▸";
 
+    private bool _isChecked;
+    /// <summary>Marcada con su casilla para actuar sobre varias a la vez (papelera, copiar rutas).</summary>
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value) return;
+            _isChecked = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+        }
+    }
+
     /// <summary>Sangria de la fila segun la profundidad.</summary>
     public Thickness Indent => new(Depth * 18, 0, 0, 0);
 
@@ -111,6 +124,19 @@ public sealed class FileRow(ScannedFile file, string sizeText, string detailText
     }
 
     public Color RowColor => IsSelected ? Color.FromArgb("#333525CD") : Colors.Transparent;
+
+    private bool _isChecked;
+    /// <summary>Marcado con su casilla para actuar sobre varios a la vez.</summary>
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value) return;
+            _isChecked = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+        }
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 }

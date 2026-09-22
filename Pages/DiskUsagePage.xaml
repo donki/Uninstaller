@@ -44,12 +44,13 @@
             </VerticalStackLayout>
         </Border>
 
-        <!-- Arbol de carpetas, aplanado: sangria por profundidad y desplegable por fila. -->
+        <!-- Arbol de carpetas, aplanado: sangria por profundidad y desplegable por fila. La casilla
+             marca varias para mandarlas a la papelera (o copiar sus rutas) de una vez. -->
         <CollectionView Grid.Row="1" x:Name="TreeList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FolderNode">
                     <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="10,8" Margin="{Binding Indent}">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" Padding="10,8" Margin="{Binding Indent}">
                             <Label Grid.Column="0" Text="{Binding Expander}" Style="{StaticResource BodyText}" WidthRequest="18" VerticalOptions="Center" HorizontalTextAlignment="Center">
                                 <Label.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnExpanderTapped" />
@@ -61,6 +62,7 @@
                                 <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" LineBreakMode="TailTruncation" />
                             </VerticalStackLayout>
                             <Label Grid.Column="2" Text="{Binding SizeText}" Style="{StaticResource BodyText}" FontAttributes="Bold" VerticalOptions="Center" />
+                            <CheckBox Grid.Column="3" IsChecked="{Binding IsChecked, Mode=TwoWay}" Color="{StaticResource Primary}" VerticalOptions="Center" CheckedChanged="OnItemCheckedChanged" />
                         </Grid>
                     </Border>
                 </DataTemplate>
@@ -97,7 +99,7 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FileRow">
                     <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,8">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Padding="12,8">
                             <VerticalStackLayout Grid.Column="0" Spacing="3">
                                 <Label Text="{Binding Name}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
                                 <Label Text="{Binding Folder}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
@@ -105,6 +107,7 @@
                                 <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" />
                             </VerticalStackLayout>
                             <Label Grid.Column="1" Text="{Binding SizeText}" Style="{StaticResource BodyText}" FontAttributes="Bold" VerticalOptions="Center" />
+                            <CheckBox Grid.Column="2" IsChecked="{Binding IsChecked, Mode=TwoWay}" Color="{StaticResource Primary}" VerticalOptions="Center" CheckedChanged="OnItemCheckedChanged" />
                         </Grid>
                     </Border>
                 </DataTemplate>
@@ -140,12 +143,13 @@
                             <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="0">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="models:FileRow">
-                                        <Grid Padding="8,5" ColumnDefinitions="*,Auto" BackgroundColor="{Binding RowColor}">
+                                        <Grid Padding="8,0,0,0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" BackgroundColor="{Binding RowColor}">
                                             <Grid.GestureRecognizers>
                                                 <TapGestureRecognizer Tapped="OnDuplicateRowTapped" />
                                             </Grid.GestureRecognizers>
-                                            <Label Grid.Column="0" Text="{Binding FullPath}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
-                                            <Label Grid.Column="1" Text="{Binding DetailText}" Style="{StaticResource HintText}" />
+                                            <Label Grid.Column="0" Text="{Binding FullPath}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" VerticalOptions="Center" />
+                                            <Label Grid.Column="1" Text="{Binding DetailText}" Style="{StaticResource HintText}" VerticalOptions="Center" />
+                                            <CheckBox Grid.Column="2" IsChecked="{Binding IsChecked, Mode=TwoWay}" Color="{StaticResource Primary}" VerticalOptions="Center" MinimumHeightRequest="30" CheckedChanged="OnItemCheckedChanged" />
                                         </Grid>
                                     </DataTemplate>
                                 </BindableLayout.ItemTemplate>

@@ -2,6 +2,17 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.22.00 — Espacio en disco: marcar varios y enviarlos a la papelera de una vez
+
+`versionCode`: 2026092200 · Windows `2026.9.22.0`
+
+- **Casillas en Espacio en disco**: cada carpeta del árbol, cada fichero de «los más grandes» y cada
+  copia de «duplicados» lleva una casilla. Con varias marcadas, la papelera se las lleva **todas en
+  una sola operación** (un solo diálogo de progreso de Windows y un solo «deshacer»), tras confirmar
+  cuántas son y cuánto ocupan; lo que no se pudo enviar se lista. Si una carpeta marcada cuelga de
+  otra también marcada, va solo la de arriba. Copiar ruta copia todas las marcadas (una por línea).
+  Sin nada marcado, los botones actúan sobre la fila elegida, como hasta ahora.
+
 ## 2026.09.21.00 — Arreglo: enviar a la papelera cerraba la aplicación
 
 `versionCode`: 2026092100 · Windows `2026.9.21.0`

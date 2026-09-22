@@ -16,4 +16,10 @@ public interface IShellActions
 
     /// <summary>Manda a la papelera (con deshacer). Devuelve false si el sistema no lo hizo.</summary>
     bool MoveToRecycleBin(string path);
+
+    /// <summary>
+    /// Manda varios a la papelera en una sola operacion (un solo dialogo de progreso y un solo
+    /// «deshacer» en Windows). Devuelve los que NO se pudieron enviar (siguen existiendo).
+    /// </summary>
+    IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths);
 }

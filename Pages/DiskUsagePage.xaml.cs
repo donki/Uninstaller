@@ -435,6 +435,54 @@ public partial class DiskUsagePage : ContentPage
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e) => UpdateActions();
 
+    private void OnItemCheckedChanged(object? sender, CheckedChangedEventArgs e) => UpdateActions();
+
+    /// <summary>
+    /// Lo marcado con las casillas en la vista actual. En el arbol, si una carpeta marcada cuelga de
+    /// otra tambien marcada, se queda solo la de arriba (la papelera se lleva todo lo de dentro).
+    /// </summary>
+    private List<string> CheckedPaths()
+    {
+        switch (_mode)
+        {
+            case ViewMode.Tree:
+            {
+                if (_root is null)
+                    return [];
+                var result = new List<string>();
+                var stack = new Stack<FolderNode>();
+                stack.Push(_root);
+                while (stack.Count > 0)
+                {
+                    var n = stack.Pop();
+                    if (n.IsChecked && !ReferenceEquals(n, _root))
+                    {
+                        result.Add(n.FullPath);
+                        continue;   // lo de dentro va con ella
+                    }
+                    foreach (var c in n.Children)
+                        stack.Push(c);
+                }
+                return result;
+            }
+            case ViewMode.Largest:
+                return ((IEnumerable<FileRow>?)LargestList.ItemsSource ?? []).Where(r => r.IsChecked).Select(r => r.FullPath).ToList();
+            case ViewMode.Duplicates:
+                return (_duplicates ?? []).SelectMany(g => g.Rows).Where(r => r.IsChecked).Select(r => r.FullPath).ToList();
+            default:
+                return [];
+        }
+    }
+
+    /// <summary>Sobre lo que actuan los botones: lo marcado si hay algo marcado; si no, lo elegido.</summary>
+    private List<string> TargetPaths()
+    {
+        var checkedPaths = CheckedPaths();
+        if (checkedPaths.Count > 0)
+            return checkedPaths;
+        return SelectedPath() is { } single ? [single] : [];
+    }
+
     private void OnDuplicateRowTapped(object? sender, TappedEventArgs e)
     {
         if ((sender as BindableObject)?.BindingContext is not FileRow row)
@@ -458,13 +506,16 @@ public partial class DiskUsagePage : ContentPage
 
     private void UpdateActions()
     {
+        var checkedCount = CheckedPaths().Count;
         var has = SelectedPath() is not null;
         OpenButton.IsEnabled = has;
-        CopyButton.IsEnabled = has;
+        CopyButton.IsEnabled = has || checkedCount > 0;
         // La raiz escaneada no se manda a la papelera desde aqui.
-        DeleteButton.IsEnabled = has && !(_mode == ViewMode.Tree && ReferenceEquals(TreeList.SelectedItem, _root))
-                                     && !(_mode == ViewMode.Map && ReferenceEquals(_mapSelected ?? _mapRoot, _root));
+        DeleteButton.IsEnabled = checkedCount > 0
+                                 || (has && !(_mode == ViewMode.Tree && ReferenceEquals(TreeList.SelectedItem, _root))
+                                         && !(_mode == ViewMode.Map && ReferenceEquals(_mapSelected ?? _mapRoot, _root)));
         ExportButton.IsEnabled = _root is not null && _scan is null;
+        ToolTipProperties.SetText(DeleteButton, checkedCount > 1 ? string.Format(_l.CurrentCulture, _l["DiskDeleteMany"], checkedCount) : _l["DiskDelete"]);
     }
 
     private async void OnOpenClicked(object? sender, EventArgs e)
@@ -477,34 +528,68 @@ public partial class DiskUsagePage : ContentPage
 
     private async void OnCopyClicked(object? sender, EventArgs e)
     {
-        if (SelectedPath() is not { } path)
+        var paths = TargetPaths();
+        if (paths.Count == 0)
             return;
-        await Clipboard.Default.SetTextAsync(path);
-        _toast.Show(_l["DiskCopied"]);
+        await Clipboard.Default.SetTextAsync(string.Join(Environment.NewLine, paths));
+        _toast.Show(paths.Count > 1 ? string.Format(_l.CurrentCulture, _l["DiskCopiedMany"], paths.Count) : _l["DiskCopied"]);
     }
 
     private async void OnDeleteClicked(object? sender, EventArgs e)
     {
-        if (SelectedPath() is not { } path)
+        var paths = TargetPaths();
+        if (paths.Count == 0)
             return;
-        var isFolder = Directory.Exists(path);
-        var confirm = await ModernDialog.AlertAsync(this, _l["DiskDelete"],
-            string.Format(_l.CurrentCulture, _l[isFolder ? "DiskDeleteFolderConfirm" : "DiskDeleteFileConfirm"], path), _l["DiskDelete"], _l["Cancel"]);
+        var culture = _l.CurrentCulture;
+        string message;
+        if (paths.Count == 1)
+        {
+            var isFolder = Directory.Exists(paths[0]);
+            message = string.Format(culture, _l[isFolder ? "DiskDeleteFolderConfirm" : "DiskDeleteFileConfirm"], paths[0]);
+        }
+        else
+        {
+            // Varios: cuantos son, cuanto ocupan y los primeros, para que se vea que es lo que va.
+            var total = paths.Sum(SizeOf);
+            var shown = string.Join(Environment.NewLine, paths.Take(8));
+            if (paths.Count > 8)
+                shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 8);
+            message = string.Format(culture, _l["DiskDeleteManyConfirm"], paths.Count, FormatSize(total), shown);
+        }
+        var confirm = await ModernDialog.AlertAsync(this, _l["DiskDelete"], message, _l["DiskDelete"], _l["Cancel"]);
         if (!confirm)
             return;
         // A la papelera en segundo plano y con el aviso a la vista: una carpeta grande tarda, y
-        // Windows enseña ademas su propio dialogo de progreso.
-        Busy(true, string.Format(_l.CurrentCulture, _l["DiskDeleting"], path));
-        bool ok;
-        try { ok = await Task.Run(() => _shell.MoveToRecycleBin(path)); }
+        // Windows enseña ademas su propio dialogo de progreso. Varios van en una sola operacion.
+        Busy(true, paths.Count == 1 ? string.Format(culture, _l["DiskDeleting"], paths[0]) : string.Format(culture, _l["DiskDeletingMany"], paths.Count));
+        IReadOnlyList<string> failed;
+        try { failed = await Task.Run(() => _shell.MoveToRecycleBin(paths)); }
         finally { Busy(false, string.Empty); }
-        if (!ok)
+        var done = paths.Where(p => !failed.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
+        foreach (var p in done)
+            RemoveFromModel(p, refresh: false);
+        if (done.Count > 0)
+            RefreshAfterRemove();
+        if (failed.Count > 0)
         {
-            await ModernDialog.AlertAsync(this, _l["Error"], string.Format(_l.CurrentCulture, _l["DiskDeleteFailed"], path), _l["Ok"]);
-            return;
+            var detail = failed.Count == 1 && paths.Count == 1
+                ? string.Format(culture, _l["DiskDeleteFailed"], failed[0])
+                : string.Format(culture, _l["DiskDeleteFailedMany"], failed.Count, string.Join(Environment.NewLine, failed.Take(8)));
+            await ModernDialog.AlertAsync(this, _l["Error"], detail, _l["Ok"]);
         }
-        RemoveFromModel(path);
-        _toast.Show(_l["DiskDeleted"]);
+        if (done.Count > 0)
+            _toast.Show(done.Count > 1 ? string.Format(culture, _l["DiskDeletedMany"], done.Count) : _l["DiskDeleted"]);
+    }
+
+    /// <summary>Lo que ocupa una ruta segun el arbol escaneado (carpeta o fichero); 0 si no esta.</summary>
+    private long SizeOf(string path)
+    {
+        if (_root is null)
+            return 0;
+        if (FindNode(_root, path) is { } node)
+            return node.Size;
+        var owner = FindNode(_root, Path.GetDirectoryName(path) ?? string.Empty);
+        return owner?.Files.FirstOrDefault(f => string.Equals(f.FullPath, path, StringComparison.OrdinalIgnoreCase))?.Size ?? 0;
     }
 
     private void Busy(bool on, string text)
@@ -516,7 +601,7 @@ public partial class DiskUsagePage : ContentPage
     }
 
     /// <summary>Tras borrar: se quita del arbol y se restan los tamaños hacia arriba, sin volver a escanear.</summary>
-    private void RemoveFromModel(string path)
+    private void RemoveFromModel(string path, bool refresh = true)
     {
         if (_root is null)
             return;
@@ -546,6 +631,15 @@ public partial class DiskUsagePage : ContentPage
                 p.FileCount -= 1;
             }
         }
+        if (refresh)
+            RefreshAfterRemove();
+    }
+
+    /// <summary>Vuelve a pintar las vistas con el arbol ya recortado (una vez, aunque se hayan borrado varios).</summary>
+    private void RefreshAfterRemove()
+    {
+        if (_root is null)
+            return;
         Describe(_root);
         RebuildRows();
         LargestList.ItemsSource = null;

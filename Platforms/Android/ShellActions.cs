@@ -19,4 +19,6 @@ public class ShellActions : IShellActions
     {
         try { File.Delete(path); return true; } catch (Exception) { return false; }
     }
+
+    public IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths) => paths.Where(p => !MoveToRecycleBin(p)).ToList();
 }

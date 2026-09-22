@@ -43,9 +43,12 @@ public class ShellActions : IShellActions
     /// leia los punteros desplazados. Y el shell quiere un hilo STA: se le da uno propio en vez del
     /// del pool (MTA) desde el que llama la pagina.
     /// </remarks>
-    public bool MoveToRecycleBin(string path)
+    public bool MoveToRecycleBin(string path) => MoveToRecycleBin([path]).Count == 0;
+
+    public IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths)
     {
-        var ok = false;
+        if (paths.Count == 0)
+            return [];
         var thread = new Thread(() =>
         {
             try
@@ -53,21 +56,19 @@ public class ShellActions : IShellActions
                 var op = new SHFILEOPSTRUCT
                 {
                     wFunc = 3,                              // FO_DELETE
-                    pFrom = path + "\0\0",
+                    // Varias rutas: separadas por un nulo y con doble nulo al final (una sola operacion).
+                    pFrom = string.Join("\0", paths) + "\0\0",
                     fFlags = 0x0040 | 0x0010,               // FOF_ALLOWUNDO | FOF_NOCONFIRMATION (con el dialogo de progreso de Windows)
                 };
-                var result = SHFileOperation(ref op);
-                ok = result == 0 && !op.fAnyOperationsAborted;
+                SHFileOperation(ref op);
             }
-            catch (Exception)
-            {
-                ok = false;
-            }
+            catch (Exception) { }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        return ok;
+        // Con varias rutas el resultado global no dice cuales fallaron: lo que sigue ahi, fallo.
+        return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
     }
 
     // Sin Pack: en x64 la estructura lleva el relleno por defecto (solo en x86 va con Pack = 1).
