@@ -22,17 +22,55 @@ public sealed class FolderNode : INotifyPropertyChanged
     public FolderNode? Parent { get; init; }
     public int Depth { get; init; }
 
+    // Los acumulados se van sumando hacia arriba MIENTRAS se escanea (desde varios hilos), para que
+    // el arbol se vea crecer; por eso son campos con Interlocked y no propiedades normales.
+    private long _size;
+    private int _fileCount, _folderCount;
+
     /// <summary>Bytes de todo lo que cuelga (ficheros propios y de todas las subcarpetas).</summary>
-    public long Size { get; set; }
-    public int FileCount { get; set; }
-    public int FolderCount { get; set; }
+    public long Size { get => Interlocked.Read(ref _size); set => Interlocked.Exchange(ref _size, value); }
+    public int FileCount { get => _fileCount; set => _fileCount = value; }
+    public int FolderCount { get => _folderCount; set => _folderCount = value; }
     public DateTime LastModified { get; set; }
+
+    /// <summary>Suma a esta carpeta y a todas las de arriba lo que se acaba de encontrar (seguro entre hilos).</summary>
+    public void Accumulate(long bytes, int files, int folders, DateTime newest)
+    {
+        for (var n = this; n is not null; n = n.Parent)
+        {
+            Interlocked.Add(ref n._size, bytes);
+            Interlocked.Add(ref n._fileCount, files);
+            Interlocked.Add(ref n._folderCount, folders);
+            if (newest > n.LastModified)
+                n.LastModified = newest;   // carrera posible entre hilos: el repaso final lo deja exacto
+        }
+    }
 
     /// <summary>No se pudo entrar (permisos): el tamaño es parcial.</summary>
     public bool Inaccessible { get; set; }
 
-    public List<FolderNode> Children { get; } = [];
+    /// <summary>
+    /// Las subcarpetas. Durante el escaneo la lista se sustituye entera (nunca se modifica en sitio),
+    /// para que la interfaz pueda leerla mientras otro hilo sigue descubriendo carpetas.
+    /// </summary>
+    public List<FolderNode> Children { get; set; } = [];
     public List<ScannedFile> Files { get; } = [];
+
+    private ImageSource? _icon;
+    /// <summary>Icono del sistema (carpeta); lo pone la pagina en Windows.</summary>
+    public ImageSource? Icon
+    {
+        get => _icon;
+        set
+        {
+            if (ReferenceEquals(_icon, value)) return;
+            _icon = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon)));
+        }
+    }
+
+    /// <summary>Durante el escaneo las subcarpetas llegan despues de crear la fila: el desplegable se entera aqui.</summary>
+    public void NotifyChildrenChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Expander)));
 
     /// <summary>Parte del padre que ocupa esta carpeta (0..1); en la raiz, 1.</summary>
     public double Percent => Parent is null || Parent.Size <= 0 ? 1 : Math.Min(1, Size / (double)Parent.Size);
@@ -108,6 +146,19 @@ public sealed class FileRow(ScannedFile file, string sizeText, string detailText
     public string Name => File.Name;
     public string FullPath => File.FullPath;
     public string Folder => File.Folder;
+
+    private ImageSource? _icon;
+    /// <summary>Icono del sistema segun la extension; lo pone la pagina en Windows.</summary>
+    public ImageSource? Icon
+    {
+        get => _icon;
+        set
+        {
+            if (ReferenceEquals(_icon, value)) return;
+            _icon = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon)));
+        }
+    }
 
     private bool _isSelected;
     /// <summary>Elegido dentro de un grupo de duplicados (la fila se resalta).</summary>

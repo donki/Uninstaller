@@ -122,10 +122,22 @@ public partial class DiskUsagePage : ContentPage
         var started = DateTime.Now;
         var progress = new Progress<ScanProgress>(p =>
             StatusLabel.Text = string.Format(_l.CurrentCulture, _l["DiskScanning"], p.Folders, p.Files, FormatSize(p.Bytes), p.Current));
+        // Mientras se escanea, el arbol se ve crecer: la raiz llega nada mas empezar y cada medio
+        // segundo se repintan las filas visibles con lo acumulado hasta el momento.
+        var live = Dispatcher.CreateTimer();
+        live.Interval = TimeSpan.FromMilliseconds(600);
+        live.Tick += (_, _) => RefreshLive();
+        if (_mode is not (ViewMode.Tree or ViewMode.Map))
+            ShowView(ViewMode.Tree);
         try
         {
-            _root = await DiskScanner.ScanAsync(path, progress, _scan.Token);
-            _root.IsExpanded = true;
+            _root = await DiskScanner.ScanAsync(path, progress, _scan.Token, root => MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _root = root;
+                RefreshLive();
+                live.Start();
+            }));
+            live.Stop();
             Describe(_root);
             RebuildRows();
             StatusLabel.Text = string.Format(_l.CurrentCulture, _l["DiskDone"], _root.FullPath, FormatSize(_root.Size), _root.FileCount, _root.FolderCount, (DateTime.Now - started).TotalSeconds.ToString("0.0", _l.CurrentCulture));
@@ -133,15 +145,26 @@ public partial class DiskUsagePage : ContentPage
         }
         catch (OperationCanceledException)
         {
+            // Lo escaneado hasta ahora se queda a la vista (con los acumulados que hubiera).
+            live.Stop();
+            if (_root is not null)
+            {
+                Describe(_root);
+                RebuildRows();
+            }
             StatusLabel.Text = _l["DiskCancelled"];
         }
         catch (Exception ex)
         {
+            live.Stop();
+            _root = null;
+            _rows.Clear();
             StatusLabel.Text = _l["DiskHint"];
             await ModernDialog.AlertAsync(this, _l["Error"], string.Format(_l.CurrentCulture, _l["DiskScanError"], path, ex.Message), _l["Ok"]);
         }
         finally
         {
+            live.Stop();
             _scan.Dispose();
             _scan = null;
             ScanButton.IsEnabled = true;
@@ -156,19 +179,54 @@ public partial class DiskUsagePage : ContentPage
     /// <summary>Textos de la fila de una carpeta y de todas las que cuelgan (una vez, tras escanear).</summary>
     private void Describe(FolderNode node)
     {
-        var culture = _l.CurrentCulture;
-        var dateFormat = culture.DateTimeFormat.ShortDatePattern.Replace("yyyy", "yy");
         var stack = new Stack<FolderNode>();
         stack.Push(node);
         while (stack.Count > 0)
         {
             var n = stack.Pop();
-            n.SizeText = FormatSize(n.Size);
-            var modified = n.LastModified == DateTime.MinValue ? "—" : n.LastModified.ToString(dateFormat, culture);
-            n.DetailText = string.Format(culture, _l["DiskFolderDetail"], (n.Percent * 100).ToString("0.#", culture), n.FileCount, n.FolderCount, modified)
-                           + (n.Inaccessible ? " · " + _l["DiskInaccessible"] : string.Empty);
+            DescribeOne(n);
             foreach (var c in n.Children)
                 stack.Push(c);
+        }
+    }
+
+    private void DescribeOne(FolderNode n)
+    {
+        var culture = _l.CurrentCulture;
+        var dateFormat = culture.DateTimeFormat.ShortDatePattern.Replace("yyyy", "yy");
+        n.Icon ??= _shell.IconFor(n.FullPath, isFolder: true);
+        n.NotifyChildrenChanged();
+        n.SizeText = FormatSize(n.Size);
+        var modified = n.LastModified == DateTime.MinValue ? "—" : n.LastModified.ToString(dateFormat, culture);
+        n.DetailText = string.Format(culture, _l["DiskFolderDetail"], (n.Percent * 100).ToString("0.#", culture), n.FileCount, n.FolderCount, modified)
+                       + (n.Inaccessible ? " · " + _l["DiskInaccessible"] : string.Empty);
+    }
+
+    /// <summary>
+    /// Durante el escaneo: se vuelven a aplanar las carpetas desplegadas (las nuevas van apareciendo)
+    /// y se repintan los textos de las filas a la vista. Solo se toca la coleccion si cambio la lista.
+    /// </summary>
+    private void RefreshLive()
+    {
+        if (_root is null)
+            return;
+        var list = new List<FolderNode>();
+        Flatten(_root, list);
+        var same = list.Count == _rows.Count;
+        for (var i = 0; same && i < list.Count; i++)
+            same = ReferenceEquals(list[i], _rows[i]);
+        if (!same)
+        {
+            _rows.Clear();
+            foreach (var n in list)
+                _rows.Add(n);
+        }
+        foreach (var n in list)
+            DescribeOne(n);
+        if (_mode == ViewMode.Map)
+        {
+            _mapRoot ??= _root;
+            RedrawMap();
         }
     }
 
@@ -293,7 +351,7 @@ public partial class DiskUsagePage : ContentPage
         var dateFormat = culture.DateTimeFormat.ShortDatePattern;
         var top = _root!.AllFiles().OrderByDescending(f => f.Size).Take(300).ToList();
         var max = top.Count > 0 ? top[0].Size : 1;
-        return top.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), f.Size / (double)max)).ToList();
+        return top.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), f.Size / (double)max) { Icon = _shell.IconFor(f.FullPath, isFolder: false) }).ToList();
     }
 
     private List<AggregateRow> BuildTypes()
@@ -364,7 +422,7 @@ public partial class DiskUsagePage : ContentPage
             {
                 g.Title = string.Format(culture, _l["DiskDuplicateTitle"], g.Files[0].Name, g.Files.Count, FormatSize(g.Size));
                 g.Detail = string.Format(culture, _l["DiskDuplicateDetail"], FormatSize(g.Wasted));
-                g.Rows.AddRange(g.Files.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), 1)));
+                g.Rows.AddRange(g.Files.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), 1) { Icon = _shell.IconFor(f.FullPath, isFolder: false) }));
             }
             _duplicates = groups;
             var wasted = groups.Sum(g => g.Wasted);
@@ -556,15 +614,28 @@ public partial class DiskUsagePage : ContentPage
                 shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 8);
             message = string.Format(culture, _l["DiskDeleteManyConfirm"], paths.Count, FormatSize(total), shown);
         }
+        // Carpetas del sistema (Windows, Archivos de programa, el perfil…): se avisa del riesgo antes de nada.
+        var risky = paths.Select(p => (Path: p, Key: _shell.SystemRisk(p))).Where(r => r.Key is not null).ToList();
+        if (risky.Count > 0)
+        {
+            var lines = string.Join(Environment.NewLine, risky.Take(6).Select(r => "• " + r.Path + " — " + _l[r.Key!]));
+            if (risky.Count > 6)
+                lines += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], risky.Count - 6);
+            // El boton principal es Cancelar: seguir es la opcion peligrosa.
+            var cancel = await ModernDialog.AlertAsync(this, _l["DiskRiskTitle"], string.Format(culture, _l["DiskRiskBody"], lines), _l["Cancel"], _l["DiskRiskContinue"]);
+            if (cancel)
+                return;
+        }
         var confirm = await ModernDialog.AlertAsync(this, _l["DiskDelete"], message, _l["DiskDelete"], _l["Cancel"]);
         if (!confirm)
             return;
-        // A la papelera en segundo plano y con el aviso a la vista: una carpeta grande tarda, y
-        // Windows enseña ademas su propio dialogo de progreso. Varios van en una sola operacion.
-        Busy(true, paths.Count == 1 ? string.Format(culture, _l["DiskDeleting"], paths[0]) : string.Format(culture, _l["DiskDeletingMany"], paths.Count));
-        IReadOnlyList<string> failed;
-        try { failed = await Task.Run(() => _shell.MoveToRecycleBin(paths)); }
-        finally { Busy(false, string.Empty); }
+        // Carpetas en las que el escaneo ni pudo entrar: sin permisos seguro; se arreglan antes de intentarlo.
+        var inaccessible = paths.Where(p => _root is not null && FindNode(_root, p) is { Inaccessible: true }).ToList();
+        if (inaccessible.Count > 0 && !await OfferPermissionsAsync(inaccessible))
+            return;
+        var failed = await RecycleAsync(paths);
+        if (failed.Count > 0 && await OfferPermissionsAsync(failed))
+            failed = await RecycleAsync(failed);
         var done = paths.Where(p => !failed.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
         foreach (var p in done)
             RemoveFromModel(p, refresh: false);
@@ -579,6 +650,40 @@ public partial class DiskUsagePage : ContentPage
         }
         if (done.Count > 0)
             _toast.Show(done.Count > 1 ? string.Format(culture, _l["DiskDeletedMany"], done.Count) : _l["DiskDeleted"]);
+    }
+
+    /// <summary>
+    /// A la papelera en segundo plano y con el aviso a la vista: una carpeta grande tarda, y Windows
+    /// enseña ademas su propio dialogo de progreso. Varios van en una sola operacion. Devuelve los que no se fueron.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> RecycleAsync(IReadOnlyList<string> paths)
+    {
+        var culture = _l.CurrentCulture;
+        Busy(true, paths.Count == 1 ? string.Format(culture, _l["DiskDeleting"], paths[0]) : string.Format(culture, _l["DiskDeletingMany"], paths.Count));
+        try { return await Task.Run(() => _shell.MoveToRecycleBin(paths)); }
+        finally { Busy(false, string.Empty); }
+    }
+
+    /// <summary>
+    /// No se pudo borrar (o no se pudo ni entrar): se propone hacerse dueño de la carpeta y de todo
+    /// su contenido y darse control total, con permiso de administrador (UAC). True si se hizo.
+    /// </summary>
+    private async Task<bool> OfferPermissionsAsync(IReadOnlyList<string> paths)
+    {
+        var culture = _l.CurrentCulture;
+        var shown = string.Join(Environment.NewLine, paths.Take(6));
+        if (paths.Count > 6)
+            shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 6);
+        var fix = await ModernDialog.AlertAsync(this, _l["DiskPermissionsTitle"], string.Format(culture, _l["DiskPermissionsBody"], shown), _l["DiskPermissionsFix"], _l["Cancel"]);
+        if (!fix)
+            return false;
+        Busy(true, _l["DiskPermissionsWorking"]);
+        bool ok;
+        try { ok = await _shell.FixPermissionsAsync(paths); }
+        finally { Busy(false, string.Empty); }
+        if (!ok)
+            _toast.Show(_l["DiskPermissionsDenied"]);
+        return ok;
     }
 
     /// <summary>Lo que ocupa una ruta segun el arbol escaneado (carpeta o fichero); 0 si no esta.</summary>

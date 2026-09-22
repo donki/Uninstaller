@@ -21,4 +21,10 @@ public class ShellActions : IShellActions
     }
 
     public IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths) => paths.Where(p => !MoveToRecycleBin(p)).ToList();
+
+    public Task<bool> FixPermissionsAsync(IReadOnlyList<string> paths) => Task.FromResult(false);
+
+    public string? SystemRisk(string path) => null;
+
+    public ImageSource? IconFor(string path, bool isFolder) => null;
 }

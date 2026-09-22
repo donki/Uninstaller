@@ -25,14 +25,21 @@ public static class DiskScanner
         ReturnSpecialDirectories = false,
     };
 
-    public static Task<FolderNode> ScanAsync(string root, IProgress<ScanProgress>? progress, CancellationToken token) => Task.Run(() =>
+    /// <summary>
+    /// Escanea. La raiz se entrega por <paramref name="onRoot"/> nada mas empezar: el arbol se va
+    /// llenando (carpetas y tamaños acumulados) mientras se recorre, y la pagina puede ir pintandolo.
+    /// Al terminar, los acumulados se recalculan de forma exacta y cada nivel queda ordenado por tamaño.
+    /// </summary>
+    public static Task<FolderNode> ScanAsync(string root, IProgress<ScanProgress>? progress, CancellationToken token, Action<FolderNode>? onRoot = null) => Task.Run(() =>
     {
         var info = new DirectoryInfo(root);
         if (!info.Exists)
             throw new DirectoryNotFoundException(root);
         var counters = new Counters(progress);
-        var node = new FolderNode { Name = info.Name.Length > 0 ? info.Name : info.FullName, FullPath = info.FullName, Depth = 0 };
+        var node = new FolderNode { Name = info.Name.Length > 0 ? info.Name : info.FullName, FullPath = info.FullName, Depth = 0, IsExpanded = true };
+        onRoot?.Invoke(node);
         Walk(node, info, counters, token, parallelLevels: 2);
+        Finish(node);
         counters.Flush(node.FullPath);
         return node;
     }, token);
@@ -76,7 +83,10 @@ public static class DiskScanner
         }
         counters.Add(files, 1, size, node.FullPath);
 
-        node.Children.AddRange(subdirs.Select(s => s.Node));
+        // Lo encontrado aqui se suma ya hacia arriba, y las subcarpetas se cuelgan (lista nueva, no en
+        // sitio): el arbol se ve crecer mientras se escanea.
+        node.Children = subdirs.Select(s => s.Node).ToList();
+        node.Accumulate(size, files, subdirs.Count, newest);
         if (parallelLevels > 0 && subdirs.Count > 1)
         {
             Parallel.ForEach(subdirs, new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = Environment.ProcessorCount },
@@ -87,10 +97,25 @@ public static class DiskScanner
             foreach (var s in subdirs)
                 Walk(s.Node, s.Dir, counters, token, 0);
         }
+    }
 
+    /// <summary>Repaso final, de abajo arriba: acumulados exactos (sin carreras) y cada nivel ordenado por tamaño.</summary>
+    private static void Finish(FolderNode node)
+    {
+        long size = 0;
+        var files = 0;
         var folders = 0;
+        var newest = DateTime.MinValue;
+        foreach (var f in node.Files)
+        {
+            size += f.Size;
+            files++;
+            if (f.Modified > newest)
+                newest = f.Modified;
+        }
         foreach (var child in node.Children)
         {
+            Finish(child);
             size += child.Size;
             files += child.FileCount;
             folders += child.FolderCount + 1;
@@ -101,7 +126,7 @@ public static class DiskScanner
         node.FileCount = files;
         node.FolderCount = folders;
         node.LastModified = newest;
-        node.Children.Sort((a, b) => b.Size.CompareTo(a.Size));
+        node.Children = node.Children.OrderByDescending(c => c.Size).ToList();
     }
 
     /// <summary>Contadores compartidos entre hilos; avisan del progreso como mucho cinco veces por segundo.</summary>

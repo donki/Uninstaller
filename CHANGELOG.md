@@ -2,6 +2,26 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.22.01 — Espacio en disco: el árbol se ve crecer, iconos del sistema, permisos y aviso de carpetas del sistema
+
+`versionCode`: 2026092201 · Windows `2026.9.22.1`
+
+- **El árbol se llena mientras se escanea**: la raíz aparece nada más empezar y cada medio segundo se
+  ven las carpetas descubiertas con lo que llevan acumulado (tamaño, ficheros, subcarpetas); se
+  pueden desplegar ya. Al parar el escaneo, lo recorrido se queda a la vista. Al terminar, cada nivel
+  queda ordenado por tamaño con los totales exactos.
+- **Iconos del sistema**: la carpeta (o el icono propio de la unidad en la raíz) en el árbol y el
+  icono de cada tipo de fichero en «los más grandes» y en «duplicados». Se sacan del shell de
+  Windows por extensión y se guardan en caché como PNG.
+- **Sin permisos para borrar**: si la papelera no se lleva algo (o el escaneo ni pudo entrar), se
+  ofrece **hacerse dueño y darse control total sobre la carpeta y todo su contenido** (Windows pide
+  permiso de administrador: `takeown` + `icacls`, quitando también las denegaciones explícitas) y se
+  vuelve a intentar. Los errores de Windows ya no salen por su cuenta: los trata la aplicación.
+- **Aviso de carpetas del sistema**: antes de enviar a la papelera algo que forma parte de Windows,
+  un programa instalado (Archivos de programa), ProgramData, el perfil de usuario (o AppData), otro
+  perfil, o lo reservado en la raíz de la unidad (papelera, restauración, arranque, memoria virtual),
+  se explica el riesgo y hay que elegir «Seguir de todos modos» (el botón principal es Cancelar).
+
 ## 2026.09.22.00 — Espacio en disco: marcar varios y enviarlos a la papelera de una vez
 
 `versionCode`: 2026092200 · Windows `2026.9.22.0`

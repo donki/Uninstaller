@@ -22,4 +22,19 @@ public interface IShellActions
     /// «deshacer» en Windows). Devuelve los que NO se pudieron enviar (siguen existiendo).
     /// </summary>
     IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths);
+
+    /// <summary>
+    /// Hace al usuario dueño de esas rutas y le da control total sobre ellas y todo su contenido
+    /// (Windows pide permiso de administrador). False si el usuario no lo concede o falla.
+    /// </summary>
+    Task<bool> FixPermissionsAsync(IReadOnlyList<string> paths);
+
+    /// <summary>
+    /// Si la ruta es (o cuelga de) una carpeta del sistema que es peligroso borrar, la clave del
+    /// texto que lo explica; si no, null.
+    /// </summary>
+    string? SystemRisk(string path);
+
+    /// <summary>Icono del sistema para una carpeta o un fichero (por su extension); null si la plataforma no los da.</summary>
+    ImageSource? IconFor(string path, bool isFolder);
 }
