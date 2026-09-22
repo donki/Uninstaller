@@ -27,4 +27,12 @@ public class ShellActions : IShellActions
     public string? SystemRisk(string path) => null;
 
     public ImageSource? IconFor(string path, bool isFolder) => null;
+
+    public bool IsInRecycleBin(string path) => false;
+
+    public string? DisplayName(string path) => null;
+
+    public bool IsRecycleBinFolder(string path) => false;
+
+    public string? RecycleBinOwner(string path) => null;
 }

@@ -2,6 +2,21 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.22.02 — La papelera: se borra definitivamente y con los nombres de verdad
+
+`versionCode`: 2026092202 · Windows `2026.9.22.2`
+
+- **Lo que ya está en la papelera se borra definitivamente.** Mandar a la papelera algo que ya está
+  dentro no hace nada, así que ahora se borra de verdad: el botón y el aviso cambian a **«Borrar
+  definitivamente»** y dicen que no se podrá recuperar. Si en la misma tanda hay cosas de fuera y de
+  dentro, se avisa de cuántas se van sin vuelta atrás. Se borra también la ficha `$I…` que acompaña a
+  cada elemento, para no dejar entradas fantasma en la papelera.
+- **Nombres de verdad, no los del sistema.** El árbol enseña el nombre con el que el Explorador
+  llama a cada carpeta: «Archivos de programa», «Usuarios», **«Papelera de reciclaje»** (con el
+  usuario dueño de cada una, en vez del SID). Y dentro de la papelera, cada elemento sale con **el
+  nombre que tenía antes de borrarlo** (leído de su ficha `$I…`) en vez de `$RA1B2C3`; también en
+  «los más grandes» y en los avisos de borrado.
+
 ## 2026.09.22.01 — Espacio en disco: el árbol se ve crecer, iconos del sistema, permisos y aviso de carpetas del sistema
 
 `versionCode`: 2026092201 · Windows `2026.9.22.1`

@@ -62,7 +62,7 @@ public sealed class TreemapDrawable : IDrawable
                 canvas.FontColor = Colors.White;
                 canvas.FontSize = 12;
                 var size = FormatSize?.Invoke(tile.Node.Size) ?? string.Empty;
-                var label = r.Height > 40 ? tile.Node.Name : $"{tile.Node.Name} · {size}";
+                var label = r.Height > 40 ? tile.Node.Display : $"{tile.Node.Display} · {size}";
                 canvas.DrawString(label, new RectF(r.X + 6, r.Y + 4, r.Width - 12, 16), HorizontalAlignment.Left, VerticalAlignment.Top);
                 if (r.Height > 40)
                     canvas.DrawString(size, new RectF(r.X + 6, r.Y + 20, r.Width - 12, 16), HorizontalAlignment.Left, VerticalAlignment.Top);
@@ -71,7 +71,7 @@ public sealed class TreemapDrawable : IDrawable
             {
                 canvas.FontColor = Colors.White.WithAlpha(0.9f);
                 canvas.FontSize = 11;
-                canvas.DrawString(tile.Node.Name, new RectF(r.X + 4, r.Bottom - 18, r.Width - 8, 14), HorizontalAlignment.Left, VerticalAlignment.Top);
+                canvas.DrawString(tile.Node.Display, new RectF(r.X + 4, r.Bottom - 18, r.Width - 8, 14), HorizontalAlignment.Left, VerticalAlignment.Top);
             }
         }
     }

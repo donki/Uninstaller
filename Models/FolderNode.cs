@@ -107,6 +107,25 @@ public sealed class FolderNode : INotifyPropertyChanged
         }
     }
 
+    private string? _display;
+    /// <summary>
+    /// Como se ensena la carpeta: el nombre del sistema si lo tiene («Papelera de reciclaje» en vez
+    /// de «$Recycle.Bin»), y si no el del disco. Lo pone la pagina.
+    /// </summary>
+    public string Display
+    {
+        get => _display ?? Name;
+        set
+        {
+            if (_display == value) return;
+            _display = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Display)));
+        }
+    }
+
+    /// <summary>Si ya se le pregunto al sistema por su nombre (aunque dijera que no tiene otro).</summary>
+    public bool DisplayResolved { get; set; }
+
     /// <summary>Sangria de la fila segun la profundidad.</summary>
     public Thickness Indent => new(Depth * 18, 0, 0, 0);
 
@@ -146,6 +165,17 @@ public sealed class FileRow(ScannedFile file, string sizeText, string detailText
     public string Name => File.Name;
     public string FullPath => File.FullPath;
     public string Folder => File.Folder;
+
+    private string? _display;
+    /// <summary>
+    /// Como se ensena el fichero: dentro de la papelera, su nombre de antes de borrarlo («$RA1B2C3»
+    /// era «factura.pdf»); si no, el del disco. Lo pone la pagina.
+    /// </summary>
+    public string Display
+    {
+        get => _display ?? Name;
+        set => _display = value;
+    }
 
     private ImageSource? _icon;
     /// <summary>Icono del sistema segun la extension; lo pone la pagina en Windows.</summary>

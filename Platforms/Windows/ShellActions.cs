@@ -51,6 +51,20 @@ public class ShellActions : IShellActions
     {
         if (paths.Count == 0)
             return [];
+        // Lo que ya esta en la papelera no se puede mandar a la papelera: se borra de verdad. Van en
+        // dos operaciones para que cada una lleve sus opciones.
+        var inBin = paths.Where(IsInRecycleBin).SelectMany(WithMetadata).ToList();
+        var rest = paths.Where(p => !IsInRecycleBin(p)).ToList();
+        Delete(rest, allowUndo: true);
+        Delete(inBin, allowUndo: false);
+        // Con varias rutas el resultado global no dice cuales fallaron: lo que sigue ahi, fallo.
+        return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+    }
+
+    private static void Delete(IReadOnlyList<string> paths, bool allowUndo)
+    {
+        if (paths.Count == 0)
+            return;
         var thread = new Thread(() =>
         {
             try
@@ -60,7 +74,9 @@ public class ShellActions : IShellActions
                     wFunc = 3,                              // FO_DELETE
                     // Varias rutas: separadas por un nulo y con doble nulo al final (una sola operacion).
                     pFrom = string.Join("\0", paths) + "\0\0",
-                    fFlags = 0x0040 | 0x0010 | 0x0400,      // FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI (el progreso lo enseña Windows; los errores los trata la pagina)
+                    // FOF_NOCONFIRMATION | FOF_NOERRORUI (el progreso lo enseña Windows; los errores
+                    // los trata la pagina) y, salvo en la papelera, FOF_ALLOWUNDO.
+                    fFlags = (ushort)((allowUndo ? 0x0040 : 0) | 0x0010 | 0x0400),
                 };
                 SHFileOperation(ref op);
             }
@@ -69,8 +85,112 @@ public class ShellActions : IShellActions
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        // Con varias rutas el resultado global no dice cuales fallaron: lo que sigue ahi, fallo.
-        return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+    }
+
+    /// <summary>
+    /// La papelera de la unidad o la carpeta del usuario dentro de ella: el sistema no les da nombre
+    /// traducido («$Recycle.Bin», o el SID del usuario), asi que lo pone la pagina.
+    /// </summary>
+    public bool IsRecycleBinFolder(string path)
+    {
+        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length is 2 or 3
+            && (parts[1].Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)
+                || parts[1].Equals("RECYCLER", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <inheritdoc/>
+    public string? RecycleBinOwner(string path)
+    {
+        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        if (!IsRecycleBinFolder(path) || parts.Length != 3)
+            return null;
+        try
+        {
+            return ((NTAccount)new SecurityIdentifier(parts[2]).Translate(typeof(NTAccount))).Value is { Length: > 0 } account
+                ? account[(account.IndexOf('\\') + 1)..]
+                : parts[2];
+        }
+        catch (Exception)
+        {
+            return parts[2];   // SID de un usuario que ya no existe en este PC
+        }
+    }
+
+    /// <summary>
+    /// El nombre que tenia antes de ir a la papelera, sacado de su ficha «$I…»: por dentro la
+    /// papelera guarda «$RA1B2C3» y solo la ficha sabe que eso era «factura.pdf». Null si la ruta no
+    /// es de la papelera o la ficha no esta.
+    /// </summary>
+    /// <remarks>
+    /// Formato de la ficha (Windows Vista en adelante): 8 bytes de version, 8 el tamaño, 8 la fecha
+    /// de borrado y, en la version 2, 4 bytes con la longitud del nombre; despues la ruta original en
+    /// UTF-16 terminada en nulo. En la version 1 la ruta ocupa 520 bytes fijos desde el byte 24.
+    /// </remarks>
+    private static string? OriginalNameInBin(string path)
+    {
+        var name = Path.GetFileName(path);
+        if (!name.StartsWith("$R", StringComparison.OrdinalIgnoreCase) || Path.GetDirectoryName(path) is not { } dir)
+            return null;
+        var info = Path.Combine(dir, "$I" + name[2..]);
+        try
+        {
+            if (!File.Exists(info))
+                return null;
+            var bytes = File.ReadAllBytes(info);
+            if (bytes.Length < 26)
+                return null;
+            var version = BitConverter.ToInt64(bytes, 0);
+            int start, chars;
+            if (version >= 2)
+            {
+                start = 28;
+                chars = BitConverter.ToInt32(bytes, 24);
+            }
+            else
+            {
+                start = 24;
+                chars = 260;
+            }
+            if (chars <= 0 || start + (chars * 2) > bytes.Length)
+                chars = (bytes.Length - start) / 2;
+            var full = Encoding.Unicode.GetString(bytes, start, chars * 2).TrimEnd('\0');
+            return full.Length == 0 ? null : Path.GetFileName(full.TrimEnd('\\'));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Dentro de la papelera, cada cosa borrada son dos ficheros: el contenido («$R…») y su ficha
+    /// («$I…», con el nombre y la fecha originales). Se borran juntos; si no, la papelera se queda
+    /// con entradas fantasma.
+    /// </summary>
+    private static IEnumerable<string> WithMetadata(string path)
+    {
+        yield return path;
+        var name = Path.GetFileName(path);
+        if (!name.StartsWith("$R", StringComparison.OrdinalIgnoreCase) || Path.GetDirectoryName(path) is not { } dir)
+            yield break;
+        var info = Path.Combine(dir, "$I" + name[2..]);
+        if (File.Exists(info))
+            yield return info;
+    }
+
+    /// <summary>
+    /// Si la ruta cuelga de la papelera de cualquier unidad: <c>X:\$Recycle.Bin\…</c> (o el
+    /// <c>RECYCLER</c> de los discos viejos). La carpeta en si no cuenta: vaciarla entera se hace
+    /// borrando lo de dentro.
+    /// </summary>
+    public bool IsInRecycleBin(string path)
+    {
+        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        // El primer tramo es la unidad o el servidor; la papelera es el segundo, y tiene que haber algo dentro.
+        return parts.Length > 2
+            && (parts[1].Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)
+                || parts[1].Equals("RECYCLER", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -182,6 +302,33 @@ public class ShellActions : IShellActions
                 return key;
         }
         return null;
+    }
+
+    /// <summary>
+    /// El nombre con el que lo ensena el Explorador, que para las carpetas conocidas es el traducido
+    /// («$Recycle.Bin» es «Papelera de reciclaje»; «Program Files», «Archivos de programa»). Null si
+    /// coincide con el del disco o si el sistema no da ninguno.
+    /// </summary>
+    public string? DisplayName(string path)
+    {
+        try
+        {
+            if (OriginalNameInBin(path) is { Length: > 0 } original)
+                return original;
+            var info = new SHFILEINFO();
+            // Sin SHGFI_USEFILEATTRIBUTES: se mira la ruta de verdad, que es la que tiene nombre propio.
+            if (SHGetFileInfo(path, 0, ref info, (uint)Marshal.SizeOf<SHFILEINFO>(), 0x200 /* SHGFI_DISPLAYNAME */) == IntPtr.Zero)
+                return null;
+            var name = info.szDisplayName;
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+            var onDisk = Path.GetFileName(path.TrimEnd('\\'));
+            return string.Equals(name, onDisk, StringComparison.Ordinal) ? null : name;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ iconos del sistema

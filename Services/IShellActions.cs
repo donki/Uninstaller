@@ -37,4 +37,26 @@ public interface IShellActions
 
     /// <summary>Icono del sistema para una carpeta o un fichero (por su extension); null si la plataforma no los da.</summary>
     ImageSource? IconFor(string path, bool isFolder);
+
+    /// <summary>
+    /// Si la ruta ya esta dentro de la papelera: entonces no hay a donde mandarla y se borra
+    /// definitivamente (la pagina lo avisa antes).
+    /// </summary>
+    bool IsInRecycleBin(string path);
+
+    /// <summary>
+    /// El nombre con el que el sistema ensena esa carpeta o fichero: «$Recycle.Bin» es «Papelera de
+    /// reciclaje» y «Program Files», «Archivos de programa». Null si no hay uno distinto del de disco.
+    /// </summary>
+    string? DisplayName(string path);
+
+    /// <summary>La papelera de una unidad (<c>X:\$Recycle.Bin</c>) o la de un usuario dentro de ella.</summary>
+    bool IsRecycleBinFolder(string path);
+
+    /// <summary>
+    /// De quien es esa papelera: dentro de X:\$Recycle.Bin hay una carpeta por usuario, con su SID
+    /// por nombre. Devuelve el nombre del usuario (o el SID si no se puede traducir); null si la ruta
+    /// es la papelera de la unidad y no la de un usuario.
+    /// </summary>
+    string? RecycleBinOwner(string path);
 }

@@ -59,7 +59,7 @@
                             <!-- Icono del sistema (el de carpeta, o el propio de la unidad en la raiz). -->
                             <Image Grid.Column="1" Source="{Binding Icon}" WidthRequest="20" HeightRequest="20" VerticalOptions="Center" />
                             <VerticalStackLayout Grid.Column="2" Spacing="3">
-                                <Label Text="{Binding Name}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                                <Label Text="{Binding Display}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
                                 <ProgressBar Progress="{Binding Percent}" ProgressColor="{StaticResource Primary}" HeightRequest="4" />
                                 <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" LineBreakMode="TailTruncation" />
                             </VerticalStackLayout>
@@ -104,7 +104,7 @@
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" Padding="12,8">
                             <Image Grid.Column="0" Source="{Binding Icon}" WidthRequest="20" HeightRequest="20" VerticalOptions="Center" />
                             <VerticalStackLayout Grid.Column="1" Spacing="3">
-                                <Label Text="{Binding Name}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
+                                <Label Text="{Binding Display}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
                                 <Label Text="{Binding Folder}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
                                 <ProgressBar Progress="{Binding Percent}" ProgressColor="{StaticResource Primary}" HeightRequest="4" />
                                 <Label Text="{Binding DetailText}" Style="{StaticResource HintText}" />

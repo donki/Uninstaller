@@ -195,6 +195,18 @@ public partial class DiskUsagePage : ContentPage
         var culture = _l.CurrentCulture;
         var dateFormat = culture.DateTimeFormat.ShortDatePattern.Replace("yyyy", "yy");
         n.Icon ??= _shell.IconFor(n.FullPath, isFolder: true);
+        // El nombre del sistema (Papelera de reciclaje, Archivos de programa, Usuarios…): se pregunta
+        // una sola vez por carpeta, y solo por las que estan a la vista.
+        if (!n.DisplayResolved)
+        {
+            n.DisplayResolved = true;
+            if (_shell.IsRecycleBinFolder(n.FullPath))
+                n.Display = _shell.RecycleBinOwner(n.FullPath) is { Length: > 0 } owner
+                    ? _l["DiskRecycleBin"] + " · " + owner
+                    : _l["DiskRecycleBin"];
+            else if (_shell.DisplayName(n.FullPath) is { Length: > 0 } display)
+                n.Display = display;
+        }
         n.NotifyChildrenChanged();
         n.SizeText = FormatSize(n.Size);
         var modified = n.LastModified == DateTime.MinValue ? "—" : n.LastModified.ToString(dateFormat, culture);
@@ -351,7 +363,11 @@ public partial class DiskUsagePage : ContentPage
         var dateFormat = culture.DateTimeFormat.ShortDatePattern;
         var top = _root!.AllFiles().OrderByDescending(f => f.Size).Take(300).ToList();
         var max = top.Count > 0 ? top[0].Size : 1;
-        return top.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), f.Size / (double)max) { Icon = _shell.IconFor(f.FullPath, isFolder: false) }).ToList();
+        return top.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), f.Size / (double)max)
+        {
+            Icon = _shell.IconFor(f.FullPath, isFolder: false),
+            Display = _shell.DisplayName(f.FullPath) is { Length: > 0 } name ? name : f.Name,
+        }).ToList();
     }
 
     private List<AggregateRow> BuildTypes()
@@ -599,21 +615,31 @@ public partial class DiskUsagePage : ContentPage
         if (paths.Count == 0)
             return;
         var culture = _l.CurrentCulture;
+        // Lo que ya esta en la papelera no se puede mandar a la papelera: se borra definitivamente, y
+        // eso cambia lo que dice el aviso y como se llama el boton.
+        var inBin = paths.Where(_shell.IsInRecycleBin).ToList();
+        var allInBin = inBin.Count == paths.Count;
+        var action = allInBin ? _l["DiskDeleteForever"] : _l["DiskDelete"];
         string message;
         if (paths.Count == 1)
         {
             var isFolder = Directory.Exists(paths[0]);
-            message = string.Format(culture, _l[isFolder ? "DiskDeleteFolderConfirm" : "DiskDeleteFileConfirm"], paths[0]);
+            message = allInBin
+                ? string.Format(culture, _l[isFolder ? "DiskDeleteForeverFolderConfirm" : "DiskDeleteForeverFileConfirm"], Label(paths[0]))
+                : string.Format(culture, _l[isFolder ? "DiskDeleteFolderConfirm" : "DiskDeleteFileConfirm"], Label(paths[0]));
         }
         else
         {
             // Varios: cuantos son, cuanto ocupan y los primeros, para que se vea que es lo que va.
             var total = paths.Sum(SizeOf);
-            var shown = string.Join(Environment.NewLine, paths.Take(8));
+            var shown = string.Join(Environment.NewLine, paths.Take(8).Select(Label));
             if (paths.Count > 8)
                 shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 8);
-            message = string.Format(culture, _l["DiskDeleteManyConfirm"], paths.Count, FormatSize(total), shown);
+            message = string.Format(culture, _l[allInBin ? "DiskDeleteForeverManyConfirm" : "DiskDeleteManyConfirm"], paths.Count, FormatSize(total), shown);
         }
+        // Mezcla: unos a la papelera y otros, los que ya estaban dentro, sin vuelta atras.
+        if (inBin.Count > 0 && !allInBin)
+            message += Environment.NewLine + Environment.NewLine + string.Format(culture, _l["DiskDeleteSomeForever"], inBin.Count);
         // Carpetas del sistema (Windows, Archivos de programa, el perfil…): se avisa del riesgo antes de nada.
         var risky = paths.Select(p => (Path: p, Key: _shell.SystemRisk(p))).Where(r => r.Key is not null).ToList();
         if (risky.Count > 0)
@@ -626,16 +652,16 @@ public partial class DiskUsagePage : ContentPage
             if (cancel)
                 return;
         }
-        var confirm = await ModernDialog.AlertAsync(this, _l["DiskDelete"], message, _l["DiskDelete"], _l["Cancel"]);
+        var confirm = await ModernDialog.AlertAsync(this, action, message, action, _l["Cancel"]);
         if (!confirm)
             return;
         // Carpetas en las que el escaneo ni pudo entrar: sin permisos seguro; se arreglan antes de intentarlo.
         var inaccessible = paths.Where(p => _root is not null && FindNode(_root, p) is { Inaccessible: true }).ToList();
         if (inaccessible.Count > 0 && !await OfferPermissionsAsync(inaccessible))
             return;
-        var failed = await RecycleAsync(paths);
+        var failed = await RecycleAsync(paths, allInBin);
         if (failed.Count > 0 && await OfferPermissionsAsync(failed))
-            failed = await RecycleAsync(failed);
+            failed = await RecycleAsync(failed, allInBin);
         var done = paths.Where(p => !failed.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
         foreach (var p in done)
             RemoveFromModel(p, refresh: false);
@@ -649,17 +675,21 @@ public partial class DiskUsagePage : ContentPage
             await ModernDialog.AlertAsync(this, _l["Error"], detail, _l["Ok"]);
         }
         if (done.Count > 0)
-            _toast.Show(done.Count > 1 ? string.Format(culture, _l["DiskDeletedMany"], done.Count) : _l["DiskDeleted"]);
+            _toast.Show(done.Count > 1
+                ? string.Format(culture, _l[allInBin ? "DiskDeletedForeverMany" : "DiskDeletedMany"], done.Count)
+                : _l[allInBin ? "DiskDeletedForever" : "DiskDeleted"]);
     }
 
     /// <summary>
     /// A la papelera en segundo plano y con el aviso a la vista: una carpeta grande tarda, y Windows
     /// enseña ademas su propio dialogo de progreso. Varios van en una sola operacion. Devuelve los que no se fueron.
     /// </summary>
-    private async Task<IReadOnlyList<string>> RecycleAsync(IReadOnlyList<string> paths)
+    private async Task<IReadOnlyList<string>> RecycleAsync(IReadOnlyList<string> paths, bool forever = false)
     {
         var culture = _l.CurrentCulture;
-        Busy(true, paths.Count == 1 ? string.Format(culture, _l["DiskDeleting"], paths[0]) : string.Format(culture, _l["DiskDeletingMany"], paths.Count));
+        Busy(true, paths.Count == 1
+            ? string.Format(culture, _l[forever ? "DiskDeletingForever" : "DiskDeleting"], paths[0])
+            : string.Format(culture, _l[forever ? "DiskDeletingForeverMany" : "DiskDeletingMany"], paths.Count));
         try { return await Task.Run(() => _shell.MoveToRecycleBin(paths)); }
         finally { Busy(false, string.Empty); }
     }
@@ -684,6 +714,18 @@ public partial class DiskUsagePage : ContentPage
         if (!ok)
             _toast.Show(_l["DiskPermissionsDenied"]);
         return ok;
+    }
+
+    /// <summary>
+    /// Como nombrar una ruta en un aviso: dentro de la papelera, la ruta de verdad es «$RA1B2C3», que
+    /// no le dice nada a nadie, asi que delante va el nombre que tenia.
+    /// </summary>
+    private string Label(string path)
+    {
+        var display = _shell.IsRecycleBinFolder(path) ? null : _shell.DisplayName(path);
+        return display is { Length: > 0 } && !string.Equals(display, Path.GetFileName(path), StringComparison.Ordinal)
+            ? display + " — " + path
+            : path;
     }
 
     /// <summary>Lo que ocupa una ruta segun el arbol escaneado (carpeta o fichero); 0 si no esta.</summary>

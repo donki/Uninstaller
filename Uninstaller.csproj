@@ -21,8 +21,8 @@
     <ApplicationId>com.socratic.uninstaller</ApplicationId>
 
     <!-- Versions (constitucion 11 / A.4: ambos valores en sincronia) -->
-    <ApplicationDisplayVersion>2026.09.22.01</ApplicationDisplayVersion>
-    <ApplicationVersion>2026092201</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.09.22.02</ApplicationDisplayVersion>
+    <ApplicationVersion>2026092202</ApplicationVersion>
 
     <!-- Accept Android SDK Licenses -->
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
@@ -51,8 +51,8 @@
     <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
     <UseInterpreter>false</UseInterpreter>
 
-    <AssemblyVersion>2026.9.22.1</AssemblyVersion>
-    <FileVersion>2026.9.22.1</FileVersion>
+    <AssemblyVersion>2026.9.22.2</AssemblyVersion>
+    <FileVersion>2026.9.22.2</FileVersion>
   </PropertyGroup>
 
   <!-- Windows: sin empaquetar durante el desarrollo (el exe arranca directamente); el MSIX para la
