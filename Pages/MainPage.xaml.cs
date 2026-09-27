@@ -303,6 +303,27 @@ public partial class MainPage : ContentPage
         ShowSystemButton.ImageSource = on ? "ic_system_w.png" : "ic_system.png";
     }
 
+    /// <summary>
+    /// Atras (constitucion Mobile 7): lo que hay abierto encima se cierra antes de salir. Primero el
+    /// buscador (se pliega y deja de filtrar), despues la seleccion; solo entonces decide el Shell.
+    /// </summary>
+    protected override bool OnBackButtonPressed()
+    {
+        if (SearchRow.IsVisible)
+        {
+            OnSearchClicked(null, EventArgs.Empty);
+            return true;
+        }
+
+        if (_apps.Any(a => a.IsSelected))
+        {
+            OnClearClicked(null, EventArgs.Empty);
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
+    }
+
     // La lupa despliega el buscador; al plegarlo se vacia el filtro, que si no se quedaba
     // filtrando sin que se viera por que faltaban aplicaciones.
     private void OnSearchClicked(object? sender, EventArgs e)

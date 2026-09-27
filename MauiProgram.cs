@@ -8,6 +8,11 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        // Gestor global de excepciones (constitucion General 6.12), antes que nada y en las dos
+        // plataformas: un error inesperado se registra y se avisa en el idioma elegido, sin cerrar.
+        SocShared.CrashGuard.Install("sOC Uninstaller", language: () =>
+            IPlatformApplication.Current?.Services.GetService<ILocalizationService>()?.CurrentLanguage);
+
         var builder = MauiApp.CreateBuilder();
 
         // Sin fuentes propias: se usa la tipografia del sistema (constitucion A.9).

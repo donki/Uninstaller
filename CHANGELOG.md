@@ -2,6 +2,24 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.28.00 — Un error ya no cierra la aplicación y el botón de atrás hace lo que se espera
+
+`versionCode`: 2026092800 · Windows `2026.9.28.0` (MSIX `2026.9.2800.0`)
+
+- **Un error inesperado ya no cierra la aplicación**, en Android ni en Windows (constitución General
+  §6.12): se apunta con su traza en `crash.log`, sale un aviso en tu idioma y la aplicación sigue.
+- **Botón de atrás del móvil** (Mobile §7): en Android 16 cerraba la aplicación desde cualquier
+  pantalla. Ahora cierra primero el diálogo que haya abierto; con el buscador abierto, lo pliega;
+  con aplicaciones marcadas, quita la selección; desde Ajustes o Acerca de vuelve a Inicio, y en
+  Inicio la aplicación se oculta sin cerrarse.
+- **Con la letra grande** el contador de arriba («188 aplicaciones instaladas · Fecha de
+  instalación») se parte en dos líneas en vez de cortar el criterio de orden.
+
+*English:* an unexpected error no longer closes the app on Android or Windows (it is logged and you
+get a notice in your language). The back button closes an open dialog or the search, or clears the
+selection first, returns to Home from Settings and About, and on Home hides the app without closing
+it. With large fonts the counter at the top wraps instead of being cut.
+
 ## 2026.09.22.02 — La papelera: se borra definitivamente y con los nombres de verdad
 
 `versionCode`: 2026092202 · Windows `2026.9.22.2`

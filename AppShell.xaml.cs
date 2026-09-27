@@ -36,6 +36,45 @@ public partial class AppShell : Shell
 #endif
     }
 
+    /// <summary>
+    /// Atras (constitucion Mobile 7). Primero se cierra el menu lateral o el dialogo que haya abierto; despues
+    /// decide la pagina visible (en Inicio: plegar el buscador, quitar la seleccion). Configuracion
+    /// y Acerca de, abiertas desde el menu, vuelven a Inicio; en Inicio la aplicacion se oculta sin
+    /// cerrarse (al volver sigue donde estaba).
+    /// </summary>
+    protected override bool OnBackButtonPressed()
+    {
+        if (FlyoutIsPresented)
+        {
+            FlyoutIsPresented = false;
+            return true;
+        }
+
+        // Un dialogo abierto (ordenar, confirmar...) se cierra antes que nada.
+        if (SocShared.ModernDialogBack.TryDismiss(CurrentPage))
+            return true;
+
+        if (base.OnBackButtonPressed())
+            return true;
+
+        if (CurrentPage is not Pages.MainPage)
+        {
+            Dispatcher.Dispatch(async () =>
+            {
+                try { await GoToAsync("//MainPage"); }
+                catch (Exception ex) { SocShared.CrashGuard.Log(ex, "Atras a Inicio"); }
+            });
+            return true;
+        }
+
+#if ANDROID
+        Platform.CurrentActivity?.MoveTaskToBack(true);
+        return true;
+#else
+        return false;
+#endif
+    }
+
     private void ApplyTexts()
     {
         HomeLabel.Text = _l["MenuHome"];

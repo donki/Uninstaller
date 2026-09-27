@@ -13,11 +13,12 @@
         <Border Grid.Row="0" Style="{StaticResource Card}" Margin="12,12,12,6">
             <VerticalStackLayout Padding="16,12" Spacing="10">
                 <!-- El contador muestra tambien el criterio de orden y abre el selector al
-                     pulsarlo, ademas del boton de ordenar. -->
+                     pulsarlo, ademas del boton de ordenar. Con la letra grande no cabe en una
+                     linea: se parte en dos en vez de cortar el criterio de orden. -->
                 <Label x:Name="CountLabel"
                        Style="{StaticResource CardTitle}"
                        FontSize="16"
-                       LineBreakMode="TailTruncation">
+                       LineBreakMode="WordWrap">
                     <Label.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnSortClicked" />
                     </Label.GestureRecognizers>
