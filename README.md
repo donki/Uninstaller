@@ -24,7 +24,7 @@ en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
   componentes de Windows. Desinstalar abre el desinstalador del fabricante (o `msiexec /X`) y espera a
   que su clave desaparezca; los paquetes MSIX se quitan con `RemovePackageAsync`, sin diálogo.
   También uno detrás de otro. Antes de empezar pregunta si hacerlo **desatendido** (sin preguntas)
-  donde el instalador lo admite: Windows Installer, Inno Setup, NSIS, `QuietUninstallString` y
+  donde el instalador lo admite: Windows Installer, los instaladores más habituales, `QuietUninstallString` y
   apps de la Store. Al minimizar se va a la bandeja.
 - **Espacio en disco** (Windows, `Pages/DiskUsagePage` + `Services/DiskScanner`): estilo TreeSize.
   Árbol de carpetas con tamaños, mapa de rectángulos (treemap «squarified», `Services/Treemap`),

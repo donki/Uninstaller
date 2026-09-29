@@ -2,6 +2,17 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.29.00 — Los textos ya no nombran instaladores de otros
+
+`versionCode`: 2026092900 · Windows `2026.9.29.0` (MSIX `2026.9.2900.0`)
+
+- **El aviso de desinstalar desatendido** ya no nombra instaladores concretos (constitución Web §4,
+  aplicada también dentro de las apps): «Windows Installer, Inno Setup, NSIS y apps de la Store»
+  pasa a «Windows Installer, los instaladores más habituales y apps de la Store». El README, igual.
+
+*English:* the unattended-uninstall notice no longer names specific third-party installers ("Windows
+Installer, the most common installers and Store apps").
+
 ## 2026.09.28.00 — Un error ya no cierra la aplicación y el botón de atrás hace lo que se espera
 
 `versionCode`: 2026092800 · Windows `2026.9.28.0` (MSIX `2026.9.2800.0`)
