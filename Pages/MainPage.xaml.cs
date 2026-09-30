@@ -135,14 +135,7 @@ public partial class MainPage : ContentPage
     // Ordena la lista segun el criterio guardado y refresca el binding.
     private void ApplySort()
     {
-        IEnumerable<InstalledApp> sorted = _settings.SortMode switch
-        {
-            "name"    => _apps.OrderBy(a => a.Label, StringComparer.CurrentCultureIgnoreCase),
-            "updated" => _apps.OrderByDescending(a => a.UpdatedDate),
-            "size"    => _apps.OrderByDescending(a => a.SizeBytes),
-            _         => _apps.OrderByDescending(a => a.InstallDate), // "install" (defecto)
-        };
-        _apps = sorted.ToList();
+        _apps = ListRules.Sort(_apps, _settings.SortMode);
         ApplyFilter();
     }
 
@@ -152,13 +145,7 @@ public partial class MainPage : ContentPage
     /// </summary>
     private void ApplyFilter()
     {
-        var term = _search.Trim();
-
-        _visible = term.Length == 0
-            ? _apps
-            : _apps.Where(app =>
-                app.Label.Contains(term, StringComparison.CurrentCultureIgnoreCase) ||
-                app.Subtitle.Contains(term, StringComparison.CurrentCultureIgnoreCase)).ToList();
+        _visible = ListRules.Filter(_apps, _search);
 
         AppsList.ItemsSource = _visible;
     }
@@ -176,7 +163,7 @@ public partial class MainPage : ContentPage
     {
         var culture = _l.CurrentCulture;
         // Ano de dos cifras: la linea entera tiene que caber en el ancho de la fila.
-        var dateFormat = culture.DateTimeFormat.ShortDatePattern.Replace("yyyy", "yy");
+        var dateFormat = ListRules.CompactDatePattern(culture);
 
         foreach (var app in _apps)
         {
@@ -199,21 +186,7 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private static string FormatSize(long bytes, CultureInfo culture)
-    {
-        const long Kb = 1024;
-        const long Mb = Kb * 1024;
-        const long Gb = Mb * 1024;
-
-        return bytes switch
-        {
-            <= 0    => "—",
-            >= Gb   => $"{(bytes / (double)Gb).ToString("0.#", culture)} GB",
-            >= Mb   => $"{(bytes / (double)Mb).ToString("0.#", culture)} MB",
-            >= Kb   => $"{(bytes / (double)Kb).ToString("0.#", culture)} kB",
-            _       => $"{bytes.ToString(culture)} B",
-        };
-    }
+    private static string FormatSize(long bytes, CultureInfo culture) => ListRules.AppSize(bytes, culture);
 
     private async void OnSortClicked(object? sender, EventArgs e)
     {

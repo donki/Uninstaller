@@ -91,29 +91,22 @@ public class ShellActions : IShellActions
     /// La papelera de la unidad o la carpeta del usuario dentro de ella: el sistema no les da nombre
     /// traducido («$Recycle.Bin», o el SID del usuario), asi que lo pone la pagina.
     /// </summary>
-    public bool IsRecycleBinFolder(string path)
-    {
-        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length is 2 or 3
-            && (parts[1].Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)
-                || parts[1].Equals("RECYCLER", StringComparison.OrdinalIgnoreCase));
-    }
+    public bool IsRecycleBinFolder(string path) => RecycleBinPaths.IsBinFolder(path);
 
     /// <inheritdoc/>
     public string? RecycleBinOwner(string path)
     {
-        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
-        if (!IsRecycleBinFolder(path) || parts.Length != 3)
+        if (RecycleBinPaths.OwnerSid(path) is not { } sid)
             return null;
         try
         {
-            return ((NTAccount)new SecurityIdentifier(parts[2]).Translate(typeof(NTAccount))).Value is { Length: > 0 } account
+            return ((NTAccount)new SecurityIdentifier(sid).Translate(typeof(NTAccount))).Value is { Length: > 0 } account
                 ? account[(account.IndexOf('\\') + 1)..]
-                : parts[2];
+                : sid;
         }
         catch (Exception)
         {
-            return parts[2];   // SID de un usuario que ya no existe en este PC
+            return sid;   // SID de un usuario que ya no existe en este PC
         }
     }
 
@@ -129,33 +122,11 @@ public class ShellActions : IShellActions
     /// </remarks>
     private static string? OriginalNameInBin(string path)
     {
-        var name = Path.GetFileName(path);
-        if (!name.StartsWith("$R", StringComparison.OrdinalIgnoreCase) || Path.GetDirectoryName(path) is not { } dir)
-            return null;
-        var info = Path.Combine(dir, "$I" + name[2..]);
         try
         {
-            if (!File.Exists(info))
-                return null;
-            var bytes = File.ReadAllBytes(info);
-            if (bytes.Length < 26)
-                return null;
-            var version = BitConverter.ToInt64(bytes, 0);
-            int start, chars;
-            if (version >= 2)
-            {
-                start = 28;
-                chars = BitConverter.ToInt32(bytes, 24);
-            }
-            else
-            {
-                start = 24;
-                chars = 260;
-            }
-            if (chars <= 0 || start + (chars * 2) > bytes.Length)
-                chars = (bytes.Length - start) / 2;
-            var full = Encoding.Unicode.GetString(bytes, start, chars * 2).TrimEnd('\0');
-            return full.Length == 0 ? null : Path.GetFileName(full.TrimEnd('\\'));
+            return RecycleBinPaths.InfoFileFor(path) is { } info && File.Exists(info)
+                ? RecycleBinPaths.OriginalName(File.ReadAllBytes(info))
+                : null;
         }
         catch (Exception)
         {
@@ -171,11 +142,7 @@ public class ShellActions : IShellActions
     private static IEnumerable<string> WithMetadata(string path)
     {
         yield return path;
-        var name = Path.GetFileName(path);
-        if (!name.StartsWith("$R", StringComparison.OrdinalIgnoreCase) || Path.GetDirectoryName(path) is not { } dir)
-            yield break;
-        var info = Path.Combine(dir, "$I" + name[2..]);
-        if (File.Exists(info))
+        if (RecycleBinPaths.InfoFileFor(path) is { } info && File.Exists(info))
             yield return info;
     }
 
@@ -184,14 +151,7 @@ public class ShellActions : IShellActions
     /// <c>RECYCLER</c> de los discos viejos). La carpeta en si no cuenta: vaciarla entera se hace
     /// borrando lo de dentro.
     /// </summary>
-    public bool IsInRecycleBin(string path)
-    {
-        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
-        // El primer tramo es la unidad o el servidor; la papelera es el segundo, y tiene que haber algo dentro.
-        return parts.Length > 2
-            && (parts[1].Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)
-                || parts[1].Equals("RECYCLER", StringComparison.OrdinalIgnoreCase));
-    }
+    public bool IsInRecycleBin(string path) => RecycleBinPaths.IsInside(path);
 
     /// <summary>
     /// takeown + icacls sobre cada ruta (recursivo en las carpetas), en un cmd elevado (UAC). El
@@ -252,57 +212,10 @@ public class ShellActions : IShellActions
 
     // ------------------------------------------------------------------ carpetas del sistema
 
-    /// <summary>Hasta donde llega la proteccion de una carpeta: solo ella, ella y sus hijas directas, o todo lo que cuelga.</summary>
-    private enum Reach { Exact, Children, Subtree }
+    // Las carpetas del sistema y su aviso: ProtectedFolders (codigo puro, con pruebas).
+    private static readonly Lazy<ProtectedFolders> Protected = new(ProtectedFolders.ForCurrentUser);
 
-    private static readonly Lazy<List<(string Path, string Key, Reach Reach)>> Protected = new(() =>
-    {
-        var list = new List<(string, string, Reach)>();
-        void Add(string path, string key, Reach reach)
-        {
-            if (path.Length > 0) list.Add((path.TrimEnd('\\'), key, reach));
-        }
-        Add(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "DiskRiskWindows", Reach.Subtree);
-        // Un programa entero (hija directa de Archivos de programa) o todo Archivos de programa; dentro de un programa ya no se avisa.
-        Add(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "DiskRiskPrograms", Reach.Children);
-        Add(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "DiskRiskPrograms", Reach.Children);
-        Add(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DiskRiskProgramData", Reach.Children);
-        // La raiz de los perfiles (y cada perfil), el perfil del usuario y sus AppData: borrarlos deja la sesion inservible.
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (profile.Length > 0)
-        {
-            Add(Path.GetDirectoryName(profile) ?? string.Empty, "DiskRiskProfile", Reach.Children);
-            Add(profile, "DiskRiskProfile", Reach.Exact);
-            Add(Path.Combine(profile, "AppData"), "DiskRiskProfile", Reach.Exact);
-            Add(Path.Combine(profile, "AppData", "Local"), "DiskRiskProfile", Reach.Exact);
-            Add(Path.Combine(profile, "AppData", "Roaming"), "DiskRiskProfile", Reach.Exact);
-            Add(Path.Combine(profile, "AppData", "LocalLow"), "DiskRiskProfile", Reach.Exact);
-        }
-        return list;
-    });
-
-    private static readonly string[] SystemNames = ["$Recycle.Bin", "System Volume Information", "Recovery", "Boot", "EFI", "PerfLogs", "hiberfil.sys", "pagefile.sys", "swapfile.sys", "bootmgr", "BOOTNXT"];
-
-    public string? SystemRisk(string path)
-    {
-        var full = path.TrimEnd('\\');
-        // Cosas de la raiz de cualquier unidad (papelera, restauracion, arranque, memoria virtual).
-        if (Path.GetDirectoryName(full) is { } parent && Path.GetPathRoot(full) is { } root && string.Equals(parent.TrimEnd('\\'), root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
-            && SystemNames.Contains(Path.GetFileName(full), StringComparer.OrdinalIgnoreCase))
-            return "DiskRiskSystem";
-        foreach (var (protectedPath, key, reach) in Protected.Value)
-        {
-            if (string.Equals(full, protectedPath, StringComparison.OrdinalIgnoreCase))
-                return key;
-            if (reach == Reach.Exact || !full.StartsWith(protectedPath + "\\", StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (reach == Reach.Subtree)
-                return key;
-            if (Path.GetDirectoryName(full) is { } dir && string.Equals(dir.TrimEnd('\\'), protectedPath, StringComparison.OrdinalIgnoreCase))
-                return key;
-        }
-        return null;
-    }
+    public string? SystemRisk(string path) => Protected.Value.Risk(path);
 
     /// <summary>
     /// El nombre con el que lo ensena el Explorador, que para las carpetas conocidas es el traducido

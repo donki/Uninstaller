@@ -17,3 +17,6 @@ releases/
 
 # Zip temporal del lanzador (lo genera tools/publicar-windows.ps1)
 Launcher/app.zip
+
+# Resultados de las pruebas y de la cobertura
+TestResults/

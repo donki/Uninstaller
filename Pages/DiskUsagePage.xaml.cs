@@ -193,7 +193,7 @@ public partial class DiskUsagePage : ContentPage
     private void DescribeOne(FolderNode n)
     {
         var culture = _l.CurrentCulture;
-        var dateFormat = culture.DateTimeFormat.ShortDatePattern.Replace("yyyy", "yy");
+        var dateFormat = ListRules.CompactDatePattern(culture);
         n.Icon ??= _shell.IconFor(n.FullPath, isFolder: true);
         // El nombre del sistema (Papelera de reciclaje, Archivos de programa, Usuarios…): se pregunta
         // una sola vez por carpeta, y solo por las que estan a la vista.
@@ -255,14 +255,7 @@ public partial class DiskUsagePage : ContentPage
             _rows.Add(n);
     }
 
-    private static void Flatten(FolderNode node, List<FolderNode> into)
-    {
-        into.Add(node);
-        if (!node.IsExpanded)
-            return;
-        foreach (var c in node.Children)
-            Flatten(c, into);
-    }
+    private static void Flatten(FolderNode node, List<FolderNode> into) => ListRules.Flatten(node, into);
 
     private void OnExpanderTapped(object? sender, TappedEventArgs e)
     {
@@ -361,12 +354,10 @@ public partial class DiskUsagePage : ContentPage
     {
         var culture = _l.CurrentCulture;
         var dateFormat = culture.DateTimeFormat.ShortDatePattern;
-        var top = _root!.AllFiles().OrderByDescending(f => f.Size).Take(300).ToList();
-        var max = top.Count > 0 ? top[0].Size : 1;
-        return top.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), f.Size / (double)max)
+        return ListRules.Largest(_root!.AllFiles(), 300).Select(t => new FileRow(t.File, FormatSize(t.File.Size), t.File.Modified.ToString(dateFormat, culture), t.Percent)
         {
-            Icon = _shell.IconFor(f.FullPath, isFolder: false),
-            Display = _shell.DisplayName(f.FullPath) is { Length: > 0 } name ? name : f.Name,
+            Icon = _shell.IconFor(t.File.FullPath, isFolder: false),
+            Display = _shell.DisplayName(t.File.FullPath) is { Length: > 0 } name ? name : t.File.Name,
         }).ToList();
     }
 
@@ -374,11 +365,7 @@ public partial class DiskUsagePage : ContentPage
     {
         var culture = _l.CurrentCulture;
         var total = Math.Max(1, _root!.Size);
-        return _root.AllFiles()
-            .GroupBy(f => f.Extension.Length > 0 ? f.Extension : _l["DiskNoExtension"])
-            .Select(g => (Label: g.Key, Size: g.Sum(f => f.Size), Count: g.Count()))
-            .OrderByDescending(g => g.Size)
-            .Take(200)
+        return ListRules.ByType(_root.AllFiles(), _l["DiskNoExtension"], 200)
             .Select(g => new AggregateRow(g.Label, g.Size, g.Count, g.Size / (double)total, FormatSize(g.Size),
                 string.Format(culture, _l["DiskAggregateDetail"], (g.Size * 100.0 / total).ToString("0.#", culture), g.Count)))
             .ToList();
@@ -388,31 +375,9 @@ public partial class DiskUsagePage : ContentPage
     {
         var culture = _l.CurrentCulture;
         var total = Math.Max(1, _root!.Size);
-        var now = DateTime.Now;
-        var buckets = new (string Key, Func<TimeSpan, bool> Match)[]
-        {
-            ("DiskAge1", a => a.TotalDays < 30),
-            ("DiskAge2", a => a.TotalDays < 180),
-            ("DiskAge3", a => a.TotalDays < 365),
-            ("DiskAge4", a => a.TotalDays < 730),
-            ("DiskAge5", _ => true),
-        };
-        var sums = new long[buckets.Length];
-        var counts = new int[buckets.Length];
-        foreach (var f in _root.AllFiles())
-        {
-            var age = now - f.Modified;
-            for (var i = 0; i < buckets.Length; i++)
-            {
-                if (buckets[i].Match(age))
-                {
-                    sums[i] += f.Size;
-                    counts[i]++;
-                    break;
-                }
-            }
-        }
-        return buckets.Select((b, i) => new AggregateRow(_l[b.Key], sums[i], counts[i], sums[i] / (double)total, FormatSize(sums[i]),
+        var buckets = new[] { "DiskAge1", "DiskAge2", "DiskAge3", "DiskAge4", "DiskAge5" };
+        var (sums, counts) = ListRules.ByAge(_root.AllFiles(), DateTime.Now);
+        return buckets.Select((b, i) => new AggregateRow(_l[b], sums[i], counts[i], sums[i] / (double)total, FormatSize(sums[i]),
             string.Format(culture, _l["DiskAggregateDetail"], (sums[i] * 100.0 / total).ToString("0.#", culture), counts[i]))).ToList();
     }
 
@@ -875,18 +840,5 @@ public partial class DiskUsagePage : ContentPage
 
     private static string Csv(string s) => s.Contains(';') || s.Contains('"') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
 
-    private string FormatSize(long bytes)
-    {
-        var culture = _l.CurrentCulture;
-        const long Kb = 1024, Mb = Kb * 1024, Gb = Mb * 1024, Tb = Gb * 1024;
-        return bytes switch
-        {
-            <= 0 => "0",
-            >= Tb => $"{(bytes / (double)Tb).ToString("0.##", culture)} TB",
-            >= Gb => $"{(bytes / (double)Gb).ToString("0.##", culture)} GB",
-            >= Mb => $"{(bytes / (double)Mb).ToString("0.#", culture)} MB",
-            >= Kb => $"{(bytes / (double)Kb).ToString("0.#", culture)} kB",
-            _ => $"{bytes.ToString(culture)} B",
-        };
-    }
+    private string FormatSize(long bytes) => ListRules.DiskSize(bytes, _l.CurrentCulture);
 }

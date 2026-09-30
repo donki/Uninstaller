@@ -118,8 +118,11 @@ public sealed class TreemapDrawable : IDrawable
         var result = new List<RectF>(new RectF[fractions.Count]);
         var indices = Enumerable.Range(0, fractions.Count).ToList();
         var x = bounds.X; var y = bounds.Y; var w = bounds.Width; var h = bounds.Height;
-        var totalArea = w * h;
-        var remaining = fractions.Sum();
+        // Las fracciones suman 1 o menos: lo que falta es el bloque de ficheros sueltos de la
+        // carpeta, que se queda sin pintar. Antes se partia de la suma, y las hijas se estiraban
+        // hasta llenarlo todo: una carpeta con la mitad de su peso en ficheros propios enseñaba sus
+        // subcarpetas al doble de su tamaño.
+        var remaining = Math.Max(1.0, fractions.Sum());
         var row = new List<int>();
         var start = 0;
         while (start < indices.Count)

@@ -47,6 +47,27 @@ en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
 - `Models/InstalledApp`, `Helpers/ServiceHelper`.
 - `Resources/Styles/`: `Colors.xaml` + `Styles.xaml` (tokens claro/oscuro), fusionados en `App.xaml`.
 
+## Pruebas
+
+**168 pruebas** (xUnit), todas pasan · cobertura del código probado **98,7 %** de líneas (95,6 %
+de ramas) · sobre toda la app **28,0 %** (1 051 de ~3 750 líneas; el resto es interfaz MAUI y
+código de plataforma: PackageManager, registro, Explorador, bandeja) · el banco tarda **~0,15 s**
+(≈ 4 s con la cobertura). Medido el 2026-09-30.
+
+```powershell
+dotnet test Uninstaller.Tests
+# con cobertura (coverlet) y resumen (ReportGenerator, herramienta local del repo)
+dotnet test Uninstaller.Tests -s Uninstaller.Tests/coverlet.runsettings --collect:"XPlat Code Coverage"
+dotnet tool restore; dotnet tool run reportgenerator -reports:Uninstaller.Tests/TestResults/*/coverage.cobertura.xml -targetdir:Uninstaller.Tests/TestResults/report -reporttypes:TextSummary
+```
+
+Se prueban la detección del instalador y la orden desatendida (MSI, Inno Setup, NSIS, orden
+silenciosa del registro), el icono y la fecha del registro, la papelera (rutas, dueño, fichas
+`$I` de las versiones 1 y 2), las carpetas protegidas, el escáner de espacio (tamaños, recuento,
+orden, enlaces, cancelación) y los duplicados, el mapa de rectángulos, el orden y la búsqueda de la
+lista, los formatos de tamaño y fecha, los idiomas y los ajustes. Todo sobre carpetas temporales:
+nada toca el registro, la papelera ni los programas de verdad.
+
 ## Permisos (constitución 6, A.3)
 
 - `QUERY_ALL_PACKAGES`: única forma en Android 11+ de enumerar todas las apps para listarlas.

@@ -2,6 +2,25 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.09.30.00 — El mapa de espacio ya no agranda las subcarpetas
+
+`versionCode`: 2026093000 · Windows `2026.9.30.0` (MSIX `2026.9.3000.0`)
+
+- **Mapa de espacio (Windows)**: en una carpeta con ficheros sueltos además de subcarpetas, las
+  subcarpetas se estiraban hasta llenar todo el rectángulo y parecían más grandes de lo que son
+  (con la mitad del peso en ficheros sueltos, salían al doble). Ahora cada una ocupa lo que le toca
+  y lo suelto queda como hueco.
+- **Ficheros más grandes**: si todos pesaban 0 bytes, la barra de cada fila recibía 0/0 y no se
+  sabía pintar. Ahora sale vacía.
+- **Papelera**: el nombre original de una ficha antigua (`$I` de la versión 1) se corta en el
+  primer nulo; si detrás había relleno sucio, antes se colaba en el nombre.
+- **Pruebas automatizadas** (`Uninstaller.Tests`, 168 pruebas). La detección del instalador, la
+  papelera, las carpetas protegidas y el orden y búsqueda de la lista salen de las páginas y del
+  código de Windows a `Services/` para poder probarlos; se comportan igual.
+
+*English:* the disk map no longer inflates subfolders of a folder that also holds loose files; the
+largest-files list no longer breaks when every file is empty. Automated tests added.
+
 ## 2026.09.29.00 — Los textos ya no nombran instaladores de otros
 
 `versionCode`: 2026092900 · Windows `2026.9.29.0` (MSIX `2026.9.2900.0`)

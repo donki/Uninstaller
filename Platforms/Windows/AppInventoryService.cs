@@ -32,12 +32,9 @@ public class AppInventoryService : IAppInventoryService
     // completo del paquete): la pagina solo conoce el PackageName.
     private readonly Dictionary<string, Win32Entry> _win32 = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Que instalador hizo el programa: de eso depende como se le pide silencio.</summary>
-    private enum Installer { Unknown, Msi, InnoSetup, Nsis }
-
-    private sealed record Win32Entry(RegistryKey Hive, string KeyPath, string UninstallString, string? QuietUninstallString, Installer Installer)
+    private sealed record Win32Entry(RegistryKey Hive, string KeyPath, string UninstallString, string? QuietUninstallString, InstallerKind Installer)
     {
-        public bool SupportsUnattended => QuietUninstallString is not null || Installer != Installer.Unknown;
+        public bool SupportsUnattended => UninstallCommands.SupportsUnattended(QuietUninstallString, Installer);
     }
 
     public Task<IReadOnlyList<InstalledApp>> GetInstalledAppsAsync(bool includeSystem)
@@ -109,9 +106,8 @@ public class AppInventoryService : IAppInventoryService
                         continue;
 
                     var id = Win32Prefix + name;
-                    var isMsi = Convert.ToInt32(key.GetValue("WindowsInstaller", 0), CultureInfo.InvariantCulture) == 1
-                                || uninstall.Contains("msiexec", StringComparison.OrdinalIgnoreCase);
-                    var entry = new Win32Entry(hive, path + "\\" + name, uninstall, quiet, isMsi ? Installer.Msi : DetectInstaller(uninstall));
+                    var isMsi = UninstallCommands.IsMsi(Convert.ToInt32(key.GetValue("WindowsInstaller", 0), CultureInfo.InvariantCulture), uninstall);
+                    var entry = new Win32Entry(hive, path + "\\" + name, uninstall, quiet, isMsi ? InstallerKind.Msi : DetectInstaller(uninstall));
                     _win32[id] = entry;
 
                     var publisher = key.GetValue("Publisher") as string ?? string.Empty;
@@ -146,7 +142,7 @@ public class AppInventoryService : IAppInventoryService
     /// <summary>InstallDate viene como AAAAMMDD; si falta, vale la fecha de la propia clave del registro.</summary>
     private static DateTime ParseInstallDate(string? raw, RegistryKey key)
     {
-        if (raw is { Length: 8 } && DateTime.TryParseExact(raw, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        if (UninstallCommands.ParseInstallDate(raw) is { } date)
             return date;
         try
         {
@@ -186,28 +182,7 @@ public class AppInventoryService : IAppInventoryService
     }
 
     /// <summary>Quita comillas, el «,indice» de DisplayIcon y los argumentos de la orden de desinstalar.</summary>
-    private static string? IconFile(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-        var text = Environment.ExpandEnvironmentVariables(value.Trim());
-        if (text.StartsWith('"'))
-        {
-            var end = text.IndexOf('"', 1);
-            return end > 1 ? text[1..end] : null;
-        }
-        var comma = text.LastIndexOf(',');
-        if (comma > 0 && int.TryParse(text[(comma + 1)..].Trim(), out _))
-            text = text[..comma];
-        var exe = text.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
-        if (exe > 0)
-            text = text[..(exe + 4)];
-        else if (text.IndexOf(".ico", StringComparison.OrdinalIgnoreCase) is var ico && ico > 0)
-            text = text[..(ico + 4)];
-        else if (text.IndexOf(".dll", StringComparison.OrdinalIgnoreCase) is var dll && dll > 0)
-            text = text[..(dll + 4)];
-        return text.Contains("msiexec", StringComparison.OrdinalIgnoreCase) ? null : text;
-    }
+    private static string? IconFile(string? value) => UninstallCommands.IconFile(value);
 
     /// <summary>
     /// Abre el desinstalador del fabricante (o msiexec) y espera a que acabe. Se da por
@@ -244,57 +219,31 @@ public class AppInventoryService : IAppInventoryService
     /// registro si la hay; si no, los modificadores de cada instalador (msiexec /qn, Inno Setup
     /// /VERYSILENT, NSIS /S). Los desconocidos van siempre con su asistente.
     /// </summary>
-    private static (string File, string Arguments) UninstallCommand(Win32Entry entry, bool unattended)
-    {
-        if (unattended && entry.QuietUninstallString is not null)
-            return SplitCommand(entry.QuietUninstallString);
-
-        var (file, arguments) = SplitCommand(entry.UninstallString);
-        if (entry.Installer == Installer.Msi)
-        {
-            // «msiexec /I{…}» en UninstallString es «modificar»: para quitar hay que pedir /X.
-            if (arguments.Contains("/I", StringComparison.OrdinalIgnoreCase) && !arguments.Contains("/X", StringComparison.OrdinalIgnoreCase))
-                arguments = arguments.Replace("/I", "/X", StringComparison.OrdinalIgnoreCase);
-            if (unattended)
-                arguments += " /qn /norestart";
-            return (file, arguments);
-        }
-        if (!unattended)
-            return (file, arguments);
-        return entry.Installer switch
-        {
-            Installer.InnoSetup => (file, (arguments + " /VERYSILENT /SUPPRESSMSGBOXES /NORESTART").Trim()),
-            Installer.Nsis => (file, (arguments + " /S").Trim()),
-            _ => (file, arguments),
-        };
-    }
+    private static (string File, string Arguments) UninstallCommand(Win32Entry entry, bool unattended) =>
+        UninstallCommands.Build(entry.UninstallString, entry.QuietUninstallString, entry.Installer, unattended);
 
     /// <summary>
     /// Inno Setup y NSIS se reconocen por una marca en el propio ejecutable de desinstalar (los dos
     /// la llevan en claro en su cabecera). Se mira solo el primer trozo del fichero.
     /// </summary>
-    private static Installer DetectInstaller(string uninstall)
+    private static InstallerKind DetectInstaller(string uninstall)
     {
         try
         {
             var (file, _) = SplitCommand(uninstall);
             if (!File.Exists(file))
-                return Installer.Unknown;
-            var name = Path.GetFileName(file);
+                return InstallerKind.Unknown;
             using var stream = File.OpenRead(file);
             var buffer = new byte[Math.Min(stream.Length, 2L * 1024 * 1024)];
             var read = stream.Read(buffer, 0, buffer.Length);
             var text = System.Text.Encoding.ASCII.GetString(buffer, 0, read);
-            if (text.Contains("Inno Setup", StringComparison.Ordinal) || name.StartsWith("unins", StringComparison.OrdinalIgnoreCase) && File.Exists(Path.ChangeExtension(file, ".dat")))
-                return Installer.InnoSetup;
-            if (text.Contains("Nullsoft", StringComparison.Ordinal) || text.Contains("NSIS Error", StringComparison.Ordinal))
-                return Installer.Nsis;
+            return UninstallCommands.DetectFromHeader(Path.GetFileName(file), text, File.Exists(Path.ChangeExtension(file, ".dat")));
         }
         catch (Exception)
         {
             // Sin acceso al fichero: se trata como desconocido y va con asistente.
         }
-        return Installer.Unknown;
+        return InstallerKind.Unknown;
     }
 
     private static bool KeyExists(Win32Entry entry)
@@ -304,21 +253,7 @@ public class AppInventoryService : IAppInventoryService
     }
 
     /// <summary>«"C:\x\unins.exe" /arg» → (C:\x\unins.exe, /arg); sin comillas se corta tras el .exe.</summary>
-    private static (string File, string Arguments) SplitCommand(string command)
-    {
-        var text = Environment.ExpandEnvironmentVariables(command.Trim());
-        if (text.StartsWith('"'))
-        {
-            var end = text.IndexOf('"', 1);
-            if (end > 1)
-                return (text[1..end], text[(end + 1)..].Trim());
-        }
-        var exe = text.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
-        if (exe > 0)
-            return (text[..(exe + 4)], text[(exe + 4)..].Trim());
-        var space = text.IndexOf(' ');
-        return space > 0 ? (text[..space], text[(space + 1)..]) : (text, string.Empty);
-    }
+    private static (string File, string Arguments) SplitCommand(string command) => UninstallCommands.Split(command);
 
     // ------------------------------------------------------------------ MSIX (PackageManager)
 

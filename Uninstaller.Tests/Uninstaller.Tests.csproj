@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pruebas de la logica de sOC Uninstaller. La app es un solo proyecto MAUI (Android y Windows), asi
+    que aqui se enlazan los ficheros puros (modelos, escaner de disco, reglas de listas, papelera,
+    carpetas protegidas, ordenes de desinstalar, mapa de rectangulos) y se compilan para net10.0.
+    Microsoft.Maui.Controls (MIT) da los tipos de MAUI que usan los modelos (colores, rectangulos,
+    ImageSource); Preferences lo sustituye la cuña de Shims/.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Uninstaller.Tests</RootNamespace>
+    <!-- La cuña de Preferences tapa a la de MAUI a proposito. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xunit (Apache-2.0), su runner (Apache-2.0), Microsoft.NET.Test.Sdk (MIT) y coverlet (MIT): solo para probar, no se distribuyen. -->
+    <PackageReference Include="coverlet.collector" Version="10.1.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Microsoft.Maui.Graphics" />
+    <Using Include="Microsoft.Maui.Controls" />
+    <Using Include="Microsoft.Maui" />
+    <Using Include="Microsoft.Maui.Storage" />
+  </ItemGroup>
+
+  <!-- Codigo de la app que se prueba (enlazado, no copiado). -->
+  <ItemGroup>
+    <Compile Include="..\Models\FolderNode.cs" Link="App\Models\FolderNode.cs" />
+    <Compile Include="..\Models\InstalledApp.cs" Link="App\Models\InstalledApp.cs" />
+    <Compile Include="..\Services\DiskScanner.cs" Link="App\Services\DiskScanner.cs" />
+    <Compile Include="..\Services\ILocalizationService.cs" Link="App\Services\ILocalizationService.cs" />
+    <Compile Include="..\Services\ISettingsService.cs" Link="App\Services\ISettingsService.cs" />
+    <Compile Include="..\Services\ListRules.cs" Link="App\Services\ListRules.cs" />
+    <Compile Include="..\Services\LocalizationService.cs" Link="App\Services\LocalizationService.cs" />
+    <Compile Include="..\Services\ProtectedFolders.cs" Link="App\Services\ProtectedFolders.cs" />
+    <Compile Include="..\Services\RecycleBinPaths.cs" Link="App\Services\RecycleBinPaths.cs" />
+    <Compile Include="..\Services\SettingsService.cs" Link="App\Services\SettingsService.cs" />
+    <Compile Include="..\Services\Treemap.cs" Link="App\Services\Treemap.cs" />
+    <Compile Include="..\Services\UninstallCommands.cs" Link="App\Services\UninstallCommands.cs" />
+  </ItemGroup>
+
+</Project>
