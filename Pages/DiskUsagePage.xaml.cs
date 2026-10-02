@@ -1,36 +1,19 @@
-﻿using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Text;
-using SocShared;
 using Uninstaller.Helpers;
 using Uninstaller.Models;
 using Uninstaller.Services;
+using Uninstaller.ViewModels;
 
 namespace Uninstaller.Pages;
 
 /// <summary>
-/// Espacio en disco, estilo TreeSize: se escanea una unidad, una carpeta o una ruta de red y se ve
-/// el arbol de carpetas con lo que ocupa cada una; ademas, los ficheros mas grandes, el reparto por
-/// tipo y por antigüedad y los ficheros duplicados. Sobre lo elegido: abrir en el Explorador,
-/// copiar la ruta y mandar a la papelera. Code-behind delgado: el trabajo lo hace DiskScanner.
+/// Espacio en disco, estilo TreeSize: enlace fino con <see cref="DiskUsageViewModel"/>, que tiene la
+/// logica. Aqui solo se vuelca su estado en los controles y se le pasan los toques.
 /// </summary>
-public partial class DiskUsagePage : ContentPage
+public partial class DiskUsagePage : ContentPage, IDiskView
 {
-    private enum ViewMode { Tree, Largest, Types, Age, Duplicates, Map }
-
     private readonly ILocalizationService _l;
-    private readonly IShellActions _shell;
-    private readonly IToastService _toast;
-    private IReadOnlyList<DriveEntry> _drives = [];
-    private FolderNode? _root;
-    private CancellationTokenSource? _scan;
-    private ViewMode _mode = ViewMode.Tree;
-    private List<DuplicateGroup>? _duplicates;
-    private readonly ObservableCollection<FolderNode> _rows = [];
-    private FileRow? _selectedDuplicate;
-    private readonly TreemapDrawable _map = new();
-    private FolderNode? _mapRoot;
-    private FolderNode? _mapSelected;
+    private readonly DiskUsageViewModel _vm;
+    private int _drawnMap = -1;
 
     /// <summary>Ruta que llega por linea de ordenes (--disk ruta): se escanea al abrir la pagina. Vacia = solo abrir.</summary>
     public static string? PendingPath { get; set; }
@@ -42,24 +25,22 @@ public partial class DiskUsagePage : ContentPage
     {
         InitializeComponent();
         _l = ServiceHelper.GetRequiredService<ILocalizationService>();
-        _shell = ServiceHelper.GetRequiredService<IShellActions>();
-        _toast = ServiceHelper.GetRequiredService<IToastService>();
-        TreeList.ItemsSource = _rows;
-        _map.FormatSize = FormatSize;
-        MapView.Drawable = _map;
+        _vm = new DiskUsageViewModel(_l, ServiceHelper.GetRequiredService<IShellActions>(),
+            ServiceHelper.GetRequiredService<IToastService>(), new PageDialogService(this), this);
+        TreeList.ItemsSource = _vm.Rows;
+        MapView.Drawable = _vm.Map;
+        _vm.Changed += (_, _) => Render();
+        PathEntry.TextChanged += (_, e) => _vm.PathText = e.NewTextValue ?? string.Empty;
         _l.LanguageChanged += (_, _) => ApplyTexts();
         ApplyTexts();
-        LoadDrives();
-        HighlightView();
-        Loaded += (_, _) =>
+        _vm.LoadDrives();
+        Loaded += async (_, _) =>
         {
             if (PendingPath is not { Length: > 0 } pending)
                 return;
             PendingPath = null;
             PathEntry.Text = pending;
-            if (PendingMap)
-                _mode = ViewMode.Map;
-            OnScanClicked(this, EventArgs.Empty);
+            await _vm.ScanAsync(startInMap: PendingMap);
         };
     }
 
@@ -68,777 +49,147 @@ public partial class DiskUsagePage : ContentPage
         Title = _l["DiskTitle"];
         PathEntry.Placeholder = _l["DiskPathPlaceholder"];
         EmptyLabel.Text = _l["DiskEmpty"];
-        if (_root is null)
-            StatusLabel.Text = _l["DiskHint"];
-        foreach (var (button, key) in new[] { (ScanButton, "DiskScan"), (StopButton, "DiskStop"), (TreeButton, "DiskTree"), (LargestButton, "DiskLargest"),
-                     (TypesButton, "DiskTypes"), (AgeButton, "DiskAge"), (DuplicatesButton, "DiskDuplicates"), (MapButton, "DiskMap"), (OpenButton, "DiskOpen"),
-                     (CopyButton, "DiskCopy"), (DeleteButton, "DiskDelete"), (ExportButton, "DiskExport"), (UpButton, "DiskUp") })
+        foreach (var (name, key) in DiskUsageViewModel.ButtonTexts)
         {
+            var button = (BindableObject)FindByName(name);
             SemanticProperties.SetDescription(button, _l[key]);
             ToolTipProperties.SetText(button, _l[key]);
         }
+        _vm.LanguageChanged();
     }
 
-    private void LoadDrives()
+    /// <summary>Vuelca el estado de la logica en los controles.</summary>
+    private void Render()
     {
-        _drives = _shell.GetDrives();
-        DrivePicker.ItemsSource = _drives.Select(d => d.TotalBytes > 0
-            ? $"{d.Label} · {FormatSize(d.TotalBytes - d.FreeBytes)} / {FormatSize(d.TotalBytes)}"
-            : d.Label).ToList();
-        if (_drives.Count > 0)
-            DrivePicker.SelectedIndex = 0;
-    }
+        if (!ReferenceEquals(DrivePicker.ItemsSource, _vm.DriveLabels))
+            DrivePicker.ItemsSource = _vm.DriveLabels;
+        if (DrivePicker.SelectedIndex != _vm.SelectedDriveIndex)
+            DrivePicker.SelectedIndex = _vm.SelectedDriveIndex;
+        if (PathEntry.Text != _vm.PathText)
+            PathEntry.Text = _vm.PathText;
+        StatusLabel.Text = _vm.StatusText;
+        ScanButton.IsEnabled = _vm.ScanEnabled;
+        StopButton.IsEnabled = _vm.StopEnabled;
+        ScanProgress.IsVisible = _vm.ProgressVisible;
+        ScanProgress.Progress = _vm.Progress;
+        BusyLabel.Text = _vm.BusyText;
+        BusyOverlay.IsVisible = _vm.BusyVisible;
+        OpenButton.IsEnabled = _vm.OpenEnabled;
+        CopyButton.IsEnabled = _vm.CopyEnabled;
+        DeleteButton.IsEnabled = _vm.DeleteEnabled;
+        ExportButton.IsEnabled = _vm.ExportEnabled;
+        UpButton.IsEnabled = _vm.UpEnabled;
+        ToolTipProperties.SetText(DeleteButton, _vm.DeleteTooltip);
 
-    private void OnDriveChanged(object? sender, EventArgs e)
-    {
-        if (DrivePicker.SelectedIndex >= 0 && DrivePicker.SelectedIndex < _drives.Count)
-            PathEntry.Text = _drives[DrivePicker.SelectedIndex].Path;
-    }
+        var mode = _vm.Mode;
+        TreeList.IsVisible = mode == DiskViewMode.Tree;
+        MapPanel.IsVisible = mode == DiskViewMode.Map;
+        LargestList.IsVisible = mode == DiskViewMode.Largest;
+        AggregateList.IsVisible = mode is DiskViewMode.Types or DiskViewMode.Age;
+        DuplicatesList.IsVisible = mode == DiskViewMode.Duplicates;
+        if (!ReferenceEquals(LargestList.ItemsSource, _vm.Largest))
+            LargestList.ItemsSource = _vm.Largest;
+        if (!ReferenceEquals(AggregateList.ItemsSource, _vm.Aggregate))
+            AggregateList.ItemsSource = _vm.Aggregate;
+        if (!ReferenceEquals(DuplicatesList.ItemsSource, _vm.Duplicates))
+            DuplicatesList.ItemsSource = _vm.Duplicates;
 
-    // ------------------------------------------------------------------ escaneo
-
-    private async void OnScanClicked(object? sender, EventArgs e)
-    {
-        var path = (PathEntry.Text ?? string.Empty).Trim().Trim('"');
-        if (path.Length == 0)
-            return;
-        if (_scan is not null)
-            return;
-
-        _scan = new CancellationTokenSource();
-        ScanButton.IsEnabled = false;
-        StopButton.IsEnabled = true;
-        ScanProgress.IsVisible = true;
-        ScanProgress.Progress = 0;
-        _root = null;
-        _duplicates = null;
-        _mapRoot = null;
-        _mapSelected = null;
-        _rows.Clear();
-        LargestList.ItemsSource = null;
-        AggregateList.ItemsSource = null;
-        DuplicatesList.ItemsSource = null;
-        UpdateActions();
-        var started = DateTime.Now;
-        var progress = new Progress<ScanProgress>(p =>
-            StatusLabel.Text = string.Format(_l.CurrentCulture, _l["DiskScanning"], p.Folders, p.Files, FormatSize(p.Bytes), p.Current));
-        // Mientras se escanea, el arbol se ve crecer: la raiz llega nada mas empezar y cada medio
-        // segundo se repintan las filas visibles con lo acumulado hasta el momento.
-        var live = Dispatcher.CreateTimer();
-        live.Interval = TimeSpan.FromMilliseconds(600);
-        live.Tick += (_, _) => RefreshLive();
-        if (_mode is not (ViewMode.Tree or ViewMode.Map))
-            ShowView(ViewMode.Tree);
-        try
-        {
-            _root = await DiskScanner.ScanAsync(path, progress, _scan.Token, root => MainThread.BeginInvokeOnMainThread(() =>
-            {
-                _root = root;
-                RefreshLive();
-                live.Start();
-            }));
-            live.Stop();
-            Describe(_root);
-            RebuildRows();
-            StatusLabel.Text = string.Format(_l.CurrentCulture, _l["DiskDone"], _root.FullPath, FormatSize(_root.Size), _root.FileCount, _root.FolderCount, (DateTime.Now - started).TotalSeconds.ToString("0.0", _l.CurrentCulture));
-            ShowView(_mode == ViewMode.Duplicates ? ViewMode.Tree : _mode);
-        }
-        catch (OperationCanceledException)
-        {
-            // Lo escaneado hasta ahora se queda a la vista (con los acumulados que hubiera).
-            live.Stop();
-            if (_root is not null)
-            {
-                Describe(_root);
-                RebuildRows();
-            }
-            StatusLabel.Text = _l["DiskCancelled"];
-        }
-        catch (Exception ex)
-        {
-            live.Stop();
-            _root = null;
-            _rows.Clear();
-            StatusLabel.Text = _l["DiskHint"];
-            await ModernDialog.AlertAsync(this, _l["Error"], string.Format(_l.CurrentCulture, _l["DiskScanError"], path, ex.Message), _l["Ok"]);
-        }
-        finally
-        {
-            live.Stop();
-            _scan.Dispose();
-            _scan = null;
-            ScanButton.IsEnabled = true;
-            StopButton.IsEnabled = false;
-            ScanProgress.IsVisible = false;
-            UpdateActions();
-        }
-    }
-
-    private void OnStopClicked(object? sender, EventArgs e) => _scan?.Cancel();
-
-    /// <summary>Textos de la fila de una carpeta y de todas las que cuelgan (una vez, tras escanear).</summary>
-    private void Describe(FolderNode node)
-    {
-        var stack = new Stack<FolderNode>();
-        stack.Push(node);
-        while (stack.Count > 0)
-        {
-            var n = stack.Pop();
-            DescribeOne(n);
-            foreach (var c in n.Children)
-                stack.Push(c);
-        }
-    }
-
-    private void DescribeOne(FolderNode n)
-    {
-        var culture = _l.CurrentCulture;
-        var dateFormat = ListRules.CompactDatePattern(culture);
-        n.Icon ??= _shell.IconFor(n.FullPath, isFolder: true);
-        // El nombre del sistema (Papelera de reciclaje, Archivos de programa, Usuarios…): se pregunta
-        // una sola vez por carpeta, y solo por las que estan a la vista.
-        if (!n.DisplayResolved)
-        {
-            n.DisplayResolved = true;
-            if (_shell.IsRecycleBinFolder(n.FullPath))
-                n.Display = _shell.RecycleBinOwner(n.FullPath) is { Length: > 0 } owner
-                    ? _l["DiskRecycleBin"] + " · " + owner
-                    : _l["DiskRecycleBin"];
-            else if (_shell.DisplayName(n.FullPath) is { Length: > 0 } display)
-                n.Display = display;
-        }
-        n.NotifyChildrenChanged();
-        n.SizeText = FormatSize(n.Size);
-        var modified = n.LastModified == DateTime.MinValue ? "—" : n.LastModified.ToString(dateFormat, culture);
-        n.DetailText = string.Format(culture, _l["DiskFolderDetail"], (n.Percent * 100).ToString("0.#", culture), n.FileCount, n.FolderCount, modified)
-                       + (n.Inaccessible ? " · " + _l["DiskInaccessible"] : string.Empty);
-    }
-
-    /// <summary>
-    /// Durante el escaneo: se vuelven a aplanar las carpetas desplegadas (las nuevas van apareciendo)
-    /// y se repintan los textos de las filas a la vista. Solo se toca la coleccion si cambio la lista.
-    /// </summary>
-    private void RefreshLive()
-    {
-        if (_root is null)
-            return;
-        var list = new List<FolderNode>();
-        Flatten(_root, list);
-        var same = list.Count == _rows.Count;
-        for (var i = 0; same && i < list.Count; i++)
-            same = ReferenceEquals(list[i], _rows[i]);
-        if (!same)
-        {
-            _rows.Clear();
-            foreach (var n in list)
-                _rows.Add(n);
-        }
-        foreach (var n in list)
-            DescribeOne(n);
-        if (_mode == ViewMode.Map)
-        {
-            _mapRoot ??= _root;
-            RedrawMap();
-        }
-    }
-
-    // ------------------------------------------------------------------ arbol aplanado
-
-    private void RebuildRows()
-    {
-        _rows.Clear();
-        if (_root is null)
-            return;
-        var list = new List<FolderNode>();
-        Flatten(_root, list);
-        foreach (var n in list)
-            _rows.Add(n);
-    }
-
-    private static void Flatten(FolderNode node, List<FolderNode> into) => ListRules.Flatten(node, into);
-
-    private void OnExpanderTapped(object? sender, TappedEventArgs e)
-    {
-        if ((sender as BindableObject)?.BindingContext is not FolderNode node || !node.HasChildren)
-            return;
-        Toggle(node);
-    }
-
-    private void Toggle(FolderNode node)
-    {
-        var index = _rows.IndexOf(node);
-        if (index < 0)
-            return;
-        if (node.IsExpanded)
-        {
-            // Se quitan todas las filas que cuelgan de ella (las que tienen mas profundidad a continuacion).
-            node.IsExpanded = false;
-            while (index + 1 < _rows.Count && _rows[index + 1].Depth > node.Depth)
-                _rows.RemoveAt(index + 1);
-        }
-        else
-        {
-            node.IsExpanded = true;
-            var list = new List<FolderNode>();
-            foreach (var c in node.Children)
-                Flatten(c, list);
-            for (var i = 0; i < list.Count; i++)
-                _rows.Insert(index + 1 + i, list[i]);
-        }
-    }
-
-    // ------------------------------------------------------------------ vistas
-
-    private async void OnViewClicked(object? sender, EventArgs e)
-    {
-        var mode = ReferenceEquals(sender, LargestButton) ? ViewMode.Largest
-            : ReferenceEquals(sender, TypesButton) ? ViewMode.Types
-            : ReferenceEquals(sender, AgeButton) ? ViewMode.Age
-            : ReferenceEquals(sender, DuplicatesButton) ? ViewMode.Duplicates
-            : ReferenceEquals(sender, MapButton) ? ViewMode.Map
-            : ViewMode.Tree;
-        if (mode == ViewMode.Duplicates && _root is not null && _duplicates is null)
-            await FindDuplicatesAsync();
-        ShowView(mode);
-    }
-
-    private void ShowView(ViewMode mode)
-    {
-        _mode = mode;
-        if (_root is not null)
-        {
-            switch (mode)
-            {
-                case ViewMode.Largest:
-                    LargestList.ItemsSource ??= BuildLargest();
-                    break;
-                case ViewMode.Types:
-                    AggregateList.ItemsSource = BuildTypes();
-                    break;
-                case ViewMode.Age:
-                    AggregateList.ItemsSource = BuildAge();
-                    break;
-                case ViewMode.Duplicates:
-                    DuplicatesList.ItemsSource = _duplicates;
-                    break;
-                case ViewMode.Map:
-                    _mapRoot ??= _root;
-                    RedrawMap();
-                    break;
-            }
-        }
-        TreeList.IsVisible = mode == ViewMode.Tree;
-        MapPanel.IsVisible = mode == ViewMode.Map;
-        UpButton.IsEnabled = mode == ViewMode.Map && _mapRoot?.Parent is not null;
-        LargestList.IsVisible = mode == ViewMode.Largest;
-        AggregateList.IsVisible = mode is ViewMode.Types or ViewMode.Age;
-        DuplicatesList.IsVisible = mode == ViewMode.Duplicates;
-        HighlightView();
-        UpdateActions();
-    }
-
-    private void HighlightView()
-    {
         var primary = (Color)Application.Current!.Resources["Primary"];
-        foreach (var (button, mode, icon) in new[] { (TreeButton, ViewMode.Tree, "ic_tree"), (LargestButton, ViewMode.Largest, "ic_biggest"),
-                     (TypesButton, ViewMode.Types, "ic_types"), (AgeButton, ViewMode.Age, "ic_clock"), (DuplicatesButton, ViewMode.Duplicates, "ic_duplicates"),
-                     (MapButton, ViewMode.Map, "ic_treemap") })
+        foreach (var (name, viewMode, icon) in DiskUsageViewModel.ViewButtons)
         {
-            var on = mode == _mode;
+            var button = (Button)FindByName(name);
+            var on = viewMode == mode;
             button.BackgroundColor = on ? primary : Colors.Transparent;
             button.ImageSource = on ? icon + "_w.png" : icon + ".png";
         }
-    }
 
-    private List<FileRow> BuildLargest()
-    {
-        var culture = _l.CurrentCulture;
-        var dateFormat = culture.DateTimeFormat.ShortDatePattern;
-        return ListRules.Largest(_root!.AllFiles(), 300).Select(t => new FileRow(t.File, FormatSize(t.File.Size), t.File.Modified.ToString(dateFormat, culture), t.Percent)
+        if (_drawnMap != _vm.MapVersion)
         {
-            Icon = _shell.IconFor(t.File.FullPath, isFolder: false),
-            Display = _shell.DisplayName(t.File.FullPath) is { Length: > 0 } name ? name : t.File.Name,
-        }).ToList();
-    }
-
-    private List<AggregateRow> BuildTypes()
-    {
-        var culture = _l.CurrentCulture;
-        var total = Math.Max(1, _root!.Size);
-        return ListRules.ByType(_root.AllFiles(), _l["DiskNoExtension"], 200)
-            .Select(g => new AggregateRow(g.Label, g.Size, g.Count, g.Size / (double)total, FormatSize(g.Size),
-                string.Format(culture, _l["DiskAggregateDetail"], (g.Size * 100.0 / total).ToString("0.#", culture), g.Count)))
-            .ToList();
-    }
-
-    private List<AggregateRow> BuildAge()
-    {
-        var culture = _l.CurrentCulture;
-        var total = Math.Max(1, _root!.Size);
-        var buckets = new[] { "DiskAge1", "DiskAge2", "DiskAge3", "DiskAge4", "DiskAge5" };
-        var (sums, counts) = ListRules.ByAge(_root.AllFiles(), DateTime.Now);
-        return buckets.Select((b, i) => new AggregateRow(_l[b], sums[i], counts[i], sums[i] / (double)total, FormatSize(sums[i]),
-            string.Format(culture, _l["DiskAggregateDetail"], (sums[i] * 100.0 / total).ToString("0.#", culture), counts[i]))).ToList();
-    }
-
-    private async Task FindDuplicatesAsync()
-    {
-        if (_root is null || _scan is not null)
-            return;
-        _scan = new CancellationTokenSource();
-        ScanButton.IsEnabled = false;
-        StopButton.IsEnabled = true;
-        ScanProgress.IsVisible = true;
-        var progress = new Progress<ScanProgress>(p =>
-        {
-            StatusLabel.Text = string.Format(_l.CurrentCulture, _l["DiskHashing"], p.Files, p.Folders, p.Current);
-            ScanProgress.Progress = p.Folders > 0 ? p.Files / (double)p.Folders : 0;
-        });
-        try
-        {
-            var groups = await DiskScanner.FindDuplicatesAsync(_root.AllFiles(), 64 * 1024, progress, _scan.Token);
-            var culture = _l.CurrentCulture;
-            var dateFormat = culture.DateTimeFormat.ShortDatePattern;
-            foreach (var g in groups)
-            {
-                g.Title = string.Format(culture, _l["DiskDuplicateTitle"], g.Files[0].Name, g.Files.Count, FormatSize(g.Size));
-                g.Detail = string.Format(culture, _l["DiskDuplicateDetail"], FormatSize(g.Wasted));
-                g.Rows.AddRange(g.Files.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), 1) { Icon = _shell.IconFor(f.FullPath, isFolder: false) }));
-            }
-            _duplicates = groups;
-            var wasted = groups.Sum(g => g.Wasted);
-            StatusLabel.Text = string.Format(culture, _l["DiskDuplicatesDone"], groups.Count, FormatSize(wasted));
-        }
-        catch (OperationCanceledException)
-        {
-            StatusLabel.Text = _l["DiskCancelled"];
-        }
-        finally
-        {
-            _scan.Dispose();
-            _scan = null;
-            ScanButton.IsEnabled = true;
-            StopButton.IsEnabled = false;
-            ScanProgress.IsVisible = false;
+            _drawnMap = _vm.MapVersion;
+            MapLabel.Text = _vm.MapLabel;
+            MapView.Invalidate();
         }
     }
 
-    // ------------------------------------------------------------------ mapa
+    // ============ IDiskView ============
 
-    private void RedrawMap()
+    public void RunOnUi(Action action) => MainThread.BeginInvokeOnMainThread(action);
+
+    public IProgress<T> CreateProgress<T>(Action<T> handler) => new Progress<T>(handler);
+
+    public IDisposable StartTimer(TimeSpan interval, Action tick)
     {
-        _map.Root = _mapRoot;
-        _map.Selected = _mapSelected;
-        _map.Dark = Application.Current?.RequestedTheme == AppTheme.Dark;
-        MapLabel.Text = _mapRoot is null ? string.Empty
-            : _mapSelected is null || ReferenceEquals(_mapSelected, _mapRoot)
-                ? $"{_mapRoot.FullPath} · {FormatSize(_mapRoot.Size)}"
-                : $"{_mapSelected.FullPath} · {FormatSize(_mapSelected.Size)} · {(_mapSelected.Percent * 100).ToString("0.#", _l.CurrentCulture)} %";
-        MapView.Invalidate();
-        UpButton.IsEnabled = _mapRoot?.Parent is not null;
+        var timer = Dispatcher.CreateTimer();
+        timer.Interval = interval;
+        timer.Tick += (_, _) => tick();
+        timer.Start();
+        return new TimerStopper(timer);
+    }
+
+    private sealed class TimerStopper(IDispatcherTimer timer) : IDisposable
+    {
+        public void Dispose() => timer.Stop();
+    }
+
+    public bool IsDarkTheme => Application.Current?.RequestedTheme == AppTheme.Dark;
+
+    public Task SetClipboardTextAsync(string text) => Clipboard.Default.SetTextAsync(text);
+
+    // ============ Toques ============
+
+    private void OnDriveChanged(object? sender, EventArgs e) => _vm.SelectDrive(DrivePicker.SelectedIndex);
+
+    private async void OnScanClicked(object? sender, EventArgs e) => await _vm.ScanAsync();
+
+    private void OnStopClicked(object? sender, EventArgs e) => _vm.Stop();
+
+    private void OnExpanderTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is FolderNode node)
+            _vm.Toggle(node);
+    }
+
+    private async void OnViewClicked(object? sender, EventArgs e)
+    {
+        var mode = DiskUsageViewModel.ViewButtons.FirstOrDefault(v => ReferenceEquals(FindByName(v.Button), sender)).Mode;
+        await _vm.ChooseViewAsync(mode);
     }
 
     private void OnMapTapped(object? sender, TappedEventArgs e)
     {
-        if (e.GetPosition(MapView) is not { } p)
-            return;
-        _mapSelected = _map.HitTest(new PointF((float)p.X, (float)p.Y));
-        RedrawMap();
-        UpdateActions();
+        if (e.GetPosition(MapView) is { } p)
+            _vm.MapTapped(new PointF((float)p.X, (float)p.Y));
     }
 
     private void OnMapDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (e.GetPosition(MapView) is not { } p)
-            return;
-        var hit = _map.HitTest(new PointF((float)p.X, (float)p.Y));
-        if (hit is null || !hit.HasChildren)
-            return;
-        _mapRoot = hit;
-        _mapSelected = null;
-        RedrawMap();
-        UpdateActions();
+        if (e.GetPosition(MapView) is { } p)
+            _vm.MapDoubleTapped(new PointF((float)p.X, (float)p.Y));
     }
 
-    private void OnUpClicked(object? sender, EventArgs e)
+    private void OnUpClicked(object? sender, EventArgs e) => _vm.MapUp();
+
+    private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_mapRoot?.Parent is null)
-            return;
-        _mapSelected = _mapRoot;
-        _mapRoot = _mapRoot.Parent;
-        RedrawMap();
-        UpdateActions();
+        _vm.TreeSelected = TreeList.SelectedItem;
+        _vm.LargestSelected = LargestList.SelectedItem;
+        _vm.UpdateActions();
     }
 
-    // ------------------------------------------------------------------ seleccion y acciones
-
-    private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e) => UpdateActions();
-
-    private void OnItemCheckedChanged(object? sender, CheckedChangedEventArgs e) => UpdateActions();
-
-    /// <summary>
-    /// Lo marcado con las casillas en la vista actual. En el arbol, si una carpeta marcada cuelga de
-    /// otra tambien marcada, se queda solo la de arriba (la papelera se lleva todo lo de dentro).
-    /// </summary>
-    private List<string> CheckedPaths()
-    {
-        switch (_mode)
-        {
-            case ViewMode.Tree:
-            {
-                if (_root is null)
-                    return [];
-                var result = new List<string>();
-                var stack = new Stack<FolderNode>();
-                stack.Push(_root);
-                while (stack.Count > 0)
-                {
-                    var n = stack.Pop();
-                    if (n.IsChecked && !ReferenceEquals(n, _root))
-                    {
-                        result.Add(n.FullPath);
-                        continue;   // lo de dentro va con ella
-                    }
-                    foreach (var c in n.Children)
-                        stack.Push(c);
-                }
-                return result;
-            }
-            case ViewMode.Largest:
-                return ((IEnumerable<FileRow>?)LargestList.ItemsSource ?? []).Where(r => r.IsChecked).Select(r => r.FullPath).ToList();
-            case ViewMode.Duplicates:
-                return (_duplicates ?? []).SelectMany(g => g.Rows).Where(r => r.IsChecked).Select(r => r.FullPath).ToList();
-            default:
-                return [];
-        }
-    }
-
-    /// <summary>Sobre lo que actuan los botones: lo marcado si hay algo marcado; si no, lo elegido.</summary>
-    private List<string> TargetPaths()
-    {
-        var checkedPaths = CheckedPaths();
-        if (checkedPaths.Count > 0)
-            return checkedPaths;
-        return SelectedPath() is { } single ? [single] : [];
-    }
+    private void OnItemCheckedChanged(object? sender, CheckedChangedEventArgs e) => _vm.UpdateActions();
 
     private void OnDuplicateRowTapped(object? sender, TappedEventArgs e)
     {
-        if ((sender as BindableObject)?.BindingContext is not FileRow row)
-            return;
-        if (_selectedDuplicate is not null)
-            _selectedDuplicate.IsSelected = false;
-        _selectedDuplicate = row;
-        row.IsSelected = true;
-        UpdateActions();
+        if ((sender as BindableObject)?.BindingContext is FileRow row)
+            _vm.SelectDuplicate(row);
     }
 
-    /// <summary>La ruta elegida en la vista actual, o null.</summary>
-    private string? SelectedPath() => _mode switch
-    {
-        ViewMode.Tree => (TreeList.SelectedItem as FolderNode)?.FullPath,
-        ViewMode.Largest => (LargestList.SelectedItem as FileRow)?.FullPath,
-        ViewMode.Duplicates => _selectedDuplicate?.FullPath,
-        ViewMode.Map => (_mapSelected ?? _mapRoot)?.FullPath,
-        _ => null,
-    };
+    private async void OnOpenClicked(object? sender, EventArgs e) => await _vm.OpenAsync();
 
-    private void UpdateActions()
-    {
-        var checkedCount = CheckedPaths().Count;
-        var has = SelectedPath() is not null;
-        OpenButton.IsEnabled = has;
-        CopyButton.IsEnabled = has || checkedCount > 0;
-        // La raiz escaneada no se manda a la papelera desde aqui.
-        DeleteButton.IsEnabled = checkedCount > 0
-                                 || (has && !(_mode == ViewMode.Tree && ReferenceEquals(TreeList.SelectedItem, _root))
-                                         && !(_mode == ViewMode.Map && ReferenceEquals(_mapSelected ?? _mapRoot, _root)));
-        ExportButton.IsEnabled = _root is not null && _scan is null;
-        ToolTipProperties.SetText(DeleteButton, checkedCount > 1 ? string.Format(_l.CurrentCulture, _l["DiskDeleteMany"], checkedCount) : _l["DiskDelete"]);
-    }
+    private async void OnCopyClicked(object? sender, EventArgs e) => await _vm.CopyAsync();
 
-    private async void OnOpenClicked(object? sender, EventArgs e)
-    {
-        if (SelectedPath() is not { } path)
-            return;
-        try { _shell.RevealInExplorer(path); }
-        catch (Exception ex) { await ModernDialog.AlertAsync(this, _l["Error"], ex.Message, _l["Ok"]); }
-    }
+    private async void OnDeleteClicked(object? sender, EventArgs e) => await _vm.DeleteAsync();
 
-    private async void OnCopyClicked(object? sender, EventArgs e)
-    {
-        var paths = TargetPaths();
-        if (paths.Count == 0)
-            return;
-        await Clipboard.Default.SetTextAsync(string.Join(Environment.NewLine, paths));
-        _toast.Show(paths.Count > 1 ? string.Format(_l.CurrentCulture, _l["DiskCopiedMany"], paths.Count) : _l["DiskCopied"]);
-    }
-
-    private async void OnDeleteClicked(object? sender, EventArgs e)
-    {
-        var paths = TargetPaths();
-        if (paths.Count == 0)
-            return;
-        var culture = _l.CurrentCulture;
-        // Lo que ya esta en la papelera no se puede mandar a la papelera: se borra definitivamente, y
-        // eso cambia lo que dice el aviso y como se llama el boton.
-        var inBin = paths.Where(_shell.IsInRecycleBin).ToList();
-        var allInBin = inBin.Count == paths.Count;
-        var action = allInBin ? _l["DiskDeleteForever"] : _l["DiskDelete"];
-        string message;
-        if (paths.Count == 1)
-        {
-            var isFolder = Directory.Exists(paths[0]);
-            message = allInBin
-                ? string.Format(culture, _l[isFolder ? "DiskDeleteForeverFolderConfirm" : "DiskDeleteForeverFileConfirm"], Label(paths[0]))
-                : string.Format(culture, _l[isFolder ? "DiskDeleteFolderConfirm" : "DiskDeleteFileConfirm"], Label(paths[0]));
-        }
-        else
-        {
-            // Varios: cuantos son, cuanto ocupan y los primeros, para que se vea que es lo que va.
-            var total = paths.Sum(SizeOf);
-            var shown = string.Join(Environment.NewLine, paths.Take(8).Select(Label));
-            if (paths.Count > 8)
-                shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 8);
-            message = string.Format(culture, _l[allInBin ? "DiskDeleteForeverManyConfirm" : "DiskDeleteManyConfirm"], paths.Count, FormatSize(total), shown);
-        }
-        // Mezcla: unos a la papelera y otros, los que ya estaban dentro, sin vuelta atras.
-        if (inBin.Count > 0 && !allInBin)
-            message += Environment.NewLine + Environment.NewLine + string.Format(culture, _l["DiskDeleteSomeForever"], inBin.Count);
-        // Carpetas del sistema (Windows, Archivos de programa, el perfil…): se avisa del riesgo antes de nada.
-        var risky = paths.Select(p => (Path: p, Key: _shell.SystemRisk(p))).Where(r => r.Key is not null).ToList();
-        if (risky.Count > 0)
-        {
-            var lines = string.Join(Environment.NewLine, risky.Take(6).Select(r => "• " + r.Path + " — " + _l[r.Key!]));
-            if (risky.Count > 6)
-                lines += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], risky.Count - 6);
-            // El boton principal es Cancelar: seguir es la opcion peligrosa.
-            var cancel = await ModernDialog.AlertAsync(this, _l["DiskRiskTitle"], string.Format(culture, _l["DiskRiskBody"], lines), _l["Cancel"], _l["DiskRiskContinue"]);
-            if (cancel)
-                return;
-        }
-        var confirm = await ModernDialog.AlertAsync(this, action, message, action, _l["Cancel"]);
-        if (!confirm)
-            return;
-        // Carpetas en las que el escaneo ni pudo entrar: sin permisos seguro; se arreglan antes de intentarlo.
-        var inaccessible = paths.Where(p => _root is not null && FindNode(_root, p) is { Inaccessible: true }).ToList();
-        if (inaccessible.Count > 0 && !await OfferPermissionsAsync(inaccessible))
-            return;
-        var failed = await RecycleAsync(paths, allInBin);
-        if (failed.Count > 0 && await OfferPermissionsAsync(failed))
-            failed = await RecycleAsync(failed, allInBin);
-        var done = paths.Where(p => !failed.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
-        foreach (var p in done)
-            RemoveFromModel(p, refresh: false);
-        if (done.Count > 0)
-            RefreshAfterRemove();
-        if (failed.Count > 0)
-        {
-            var detail = failed.Count == 1 && paths.Count == 1
-                ? string.Format(culture, _l["DiskDeleteFailed"], failed[0])
-                : string.Format(culture, _l["DiskDeleteFailedMany"], failed.Count, string.Join(Environment.NewLine, failed.Take(8)));
-            await ModernDialog.AlertAsync(this, _l["Error"], detail, _l["Ok"]);
-        }
-        if (done.Count > 0)
-            _toast.Show(done.Count > 1
-                ? string.Format(culture, _l[allInBin ? "DiskDeletedForeverMany" : "DiskDeletedMany"], done.Count)
-                : _l[allInBin ? "DiskDeletedForever" : "DiskDeleted"]);
-    }
-
-    /// <summary>
-    /// A la papelera en segundo plano y con el aviso a la vista: una carpeta grande tarda, y Windows
-    /// enseña ademas su propio dialogo de progreso. Varios van en una sola operacion. Devuelve los que no se fueron.
-    /// </summary>
-    private async Task<IReadOnlyList<string>> RecycleAsync(IReadOnlyList<string> paths, bool forever = false)
-    {
-        var culture = _l.CurrentCulture;
-        Busy(true, paths.Count == 1
-            ? string.Format(culture, _l[forever ? "DiskDeletingForever" : "DiskDeleting"], paths[0])
-            : string.Format(culture, _l[forever ? "DiskDeletingForeverMany" : "DiskDeletingMany"], paths.Count));
-        try { return await Task.Run(() => _shell.MoveToRecycleBin(paths)); }
-        finally { Busy(false, string.Empty); }
-    }
-
-    /// <summary>
-    /// No se pudo borrar (o no se pudo ni entrar): se propone hacerse dueño de la carpeta y de todo
-    /// su contenido y darse control total, con permiso de administrador (UAC). True si se hizo.
-    /// </summary>
-    private async Task<bool> OfferPermissionsAsync(IReadOnlyList<string> paths)
-    {
-        var culture = _l.CurrentCulture;
-        var shown = string.Join(Environment.NewLine, paths.Take(6));
-        if (paths.Count > 6)
-            shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 6);
-        var fix = await ModernDialog.AlertAsync(this, _l["DiskPermissionsTitle"], string.Format(culture, _l["DiskPermissionsBody"], shown), _l["DiskPermissionsFix"], _l["Cancel"]);
-        if (!fix)
-            return false;
-        Busy(true, _l["DiskPermissionsWorking"]);
-        bool ok;
-        try { ok = await _shell.FixPermissionsAsync(paths); }
-        finally { Busy(false, string.Empty); }
-        if (!ok)
-            _toast.Show(_l["DiskPermissionsDenied"]);
-        return ok;
-    }
-
-    /// <summary>
-    /// Como nombrar una ruta en un aviso: dentro de la papelera, la ruta de verdad es «$RA1B2C3», que
-    /// no le dice nada a nadie, asi que delante va el nombre que tenia.
-    /// </summary>
-    private string Label(string path)
-    {
-        var display = _shell.IsRecycleBinFolder(path) ? null : _shell.DisplayName(path);
-        return display is { Length: > 0 } && !string.Equals(display, Path.GetFileName(path), StringComparison.Ordinal)
-            ? display + " — " + path
-            : path;
-    }
-
-    /// <summary>Lo que ocupa una ruta segun el arbol escaneado (carpeta o fichero); 0 si no esta.</summary>
-    private long SizeOf(string path)
-    {
-        if (_root is null)
-            return 0;
-        if (FindNode(_root, path) is { } node)
-            return node.Size;
-        var owner = FindNode(_root, Path.GetDirectoryName(path) ?? string.Empty);
-        return owner?.Files.FirstOrDefault(f => string.Equals(f.FullPath, path, StringComparison.OrdinalIgnoreCase))?.Size ?? 0;
-    }
-
-    private void Busy(bool on, string text)
-    {
-        BusyLabel.Text = text;
-        BusyOverlay.IsVisible = on;
-        ScanButton.IsEnabled = !on;
-        DeleteButton.IsEnabled = !on && DeleteButton.IsEnabled;
-    }
-
-    /// <summary>Tras borrar: se quita del arbol y se restan los tamaños hacia arriba, sin volver a escanear.</summary>
-    private void RemoveFromModel(string path, bool refresh = true)
-    {
-        if (_root is null)
-            return;
-        // Carpeta
-        var node = FindNode(_root, path);
-        if (node is not null && node.Parent is not null)
-        {
-            node.Parent.Children.Remove(node);
-            for (var p = node.Parent; p is not null; p = p.Parent)
-            {
-                p.Size -= node.Size;
-                p.FileCount -= node.FileCount;
-                p.FolderCount -= node.FolderCount + 1;
-            }
-        }
-        else
-        {
-            // Fichero
-            var owner = FindNode(_root, Path.GetDirectoryName(path) ?? string.Empty);
-            var file = owner?.Files.FirstOrDefault(f => string.Equals(f.FullPath, path, StringComparison.OrdinalIgnoreCase));
-            if (owner is null || file is null)
-                return;
-            owner.Files.Remove(file);
-            for (var p = owner; p is not null; p = p.Parent)
-            {
-                p.Size -= file.Size;
-                p.FileCount -= 1;
-            }
-        }
-        if (refresh)
-            RefreshAfterRemove();
-    }
-
-    /// <summary>Vuelve a pintar las vistas con el arbol ya recortado (una vez, aunque se hayan borrado varios).</summary>
-    private void RefreshAfterRemove()
-    {
-        if (_root is null)
-            return;
-        Describe(_root);
-        RebuildRows();
-        LargestList.ItemsSource = null;
-        _duplicates = null;
-        _selectedDuplicate = null;
-        if (_mapRoot is not null && FindNode(_root, _mapRoot.FullPath) is null)
-            _mapRoot = _root;
-        _mapSelected = null;
-        ShowView(_mode == ViewMode.Duplicates ? ViewMode.Tree : _mode);
-    }
-
-    private static FolderNode? FindNode(FolderNode root, string path)
-    {
-        if (string.Equals(root.FullPath.TrimEnd('\\', '/'), path.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
-            return root;
-        foreach (var c in root.Children)
-        {
-            if (path.StartsWith(c.FullPath, StringComparison.OrdinalIgnoreCase) && FindNode(c, path) is { } found)
-                return found;
-        }
-        return null;
-    }
-
-    // ------------------------------------------------------------------ exportar
-
-    private async void OnExportClicked(object? sender, EventArgs e)
-    {
-        if (_root is null)
-            return;
-        var sb = new StringBuilder();
-        switch (_mode)
-        {
-            case ViewMode.Largest:
-                sb.AppendLine("Ruta;Bytes;Modificado");
-                foreach (var f in _root.AllFiles().OrderByDescending(f => f.Size).Take(300))
-                    sb.AppendLine($"{Csv(f.FullPath)};{f.Size};{f.Modified:yyyy-MM-dd HH:mm}");
-                break;
-            case ViewMode.Types:
-            case ViewMode.Age:
-                sb.AppendLine("Grupo;Bytes;Ficheros");
-                foreach (var r in (IEnumerable<AggregateRow>?)AggregateList.ItemsSource ?? [])
-                    sb.AppendLine($"{Csv(r.Label)};{r.Size};{r.Count}");
-                break;
-            case ViewMode.Duplicates:
-                sb.AppendLine("Grupo;Ruta;Bytes;Modificado");
-                var n = 0;
-                foreach (var g in _duplicates ?? [])
-                {
-                    n++;
-                    foreach (var f in g.Files)
-                        sb.AppendLine($"{n};{Csv(f.FullPath)};{f.Size};{f.Modified:yyyy-MM-dd HH:mm}");
-                }
-                break;
-            default:
-                sb.AppendLine("Carpeta;Bytes;Ficheros;Carpetas;Modificado");
-                var all = new List<FolderNode>();
-                var stack = new Stack<FolderNode>();
-                stack.Push(_root);
-                while (stack.Count > 0)
-                {
-                    var node = stack.Pop();
-                    all.Add(node);
-                    foreach (var c in node.Children)
-                        stack.Push(c);
-                }
-                foreach (var node in all.OrderByDescending(x => x.Size))
-                    sb.AppendLine($"{Csv(node.FullPath)};{node.Size};{node.FileCount};{node.FolderCount};{node.LastModified:yyyy-MM-dd HH:mm}");
-                break;
-        }
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        var file = Path.Combine(folder, $"sOCUninstaller-espacio-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-        Busy(true, string.Format(_l.CurrentCulture, _l["DiskExporting"], file));
-        try
-        {
-            await File.WriteAllTextAsync(file, sb.ToString(), new UTF8Encoding(true));
-            Busy(false, string.Empty);
-            _toast.Show(string.Format(_l.CurrentCulture, _l["DiskExported"], file));
-            _shell.RevealInExplorer(file);
-        }
-        catch (Exception ex)
-        {
-            Busy(false, string.Empty);
-            await ModernDialog.AlertAsync(this, _l["Error"], ex.Message, _l["Ok"]);
-        }
-    }
-
-    private static string Csv(string s) => s.Contains(';') || s.Contains('"') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
-
-    private string FormatSize(long bytes) => ListRules.DiskSize(bytes, _l.CurrentCulture);
+    private async void OnExportClicked(object? sender, EventArgs e) =>
+        await _vm.ExportAsync(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), DateTime.Now);
 }

@@ -12,7 +12,7 @@
           <Format>cobertura</Format>
           <IncludeTestAssembly>true</IncludeTestAssembly>
           <ExcludeByFile>**/Uninstaller.Tests/**/*.cs</ExcludeByFile>
-          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <ExcludeByAttribute>GeneratedCodeAttribute</ExcludeByAttribute>
         </Configuration>
       </DataCollector>
     </DataCollectors>

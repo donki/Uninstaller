@@ -133,7 +133,7 @@ public class TreemapTests
     }
 
     /// <summary>Lienzo que no pinta: apunta lo que se le pide.</summary>
-    private sealed class RecordingCanvas : ICanvas
+    internal sealed class RecordingCanvas : ICanvas
     {
         public List<string> Strings { get; } = [];
         public HashSet<float> StrokeWidths { get; } = [];

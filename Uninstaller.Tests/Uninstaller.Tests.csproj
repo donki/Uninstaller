@@ -56,6 +56,15 @@
     <Compile Include="..\Services\SettingsService.cs" Link="App\Services\SettingsService.cs" />
     <Compile Include="..\Services\Treemap.cs" Link="App\Services\Treemap.cs" />
     <Compile Include="..\Services\UninstallCommands.cs" Link="App\Services\UninstallCommands.cs" />
+    <Compile Include="..\Services\IAppInventoryService.cs" Link="App\Services\IAppInventoryService.cs" />
+    <Compile Include="..\Services\IShellActions.cs" Link="App\Services\IShellActions.cs" />
+    <Compile Include="..\Services\IToastService.cs" Link="App\Services\IToastService.cs" />
+    <Compile Include="..\Services\IDialogService.cs" Link="App\Services\IDialogService.cs" />
+    <Compile Include="..\Services\IAppEnvironment.cs" Link="App\Services\IAppEnvironment.cs" />
+    <Compile Include="..\Services\IDesktopIntegration.cs" Link="App\Services\IDesktopIntegration.cs" />
+    <Compile Include="..\Services\UpdateService.cs" Link="App\Services\UpdateService.cs" />
+    <Compile Include="..\Services\UninstallRegistry.cs" Link="App\Services\UninstallRegistry.cs" />
+    <Compile Include="..\ViewModels\*.cs" Link="App\ViewModels\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

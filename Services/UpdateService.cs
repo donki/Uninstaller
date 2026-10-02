@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using SocShared;
 
 namespace Uninstaller.Services;
 
@@ -12,15 +11,28 @@ namespace Uninstaller.Services;
 /// </summary>
 public class UpdateService
 {
-    private const string AppcastUrl = "https://raw.githubusercontent.com/donki/Uninstaller/main/appcast.json";
+    public const string AppcastUrl = "https://raw.githubusercontent.com/donki/Uninstaller/main/appcast.json";
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
+    private static readonly HttpClient SharedHttp = new() { Timeout = TimeSpan.FromSeconds(8) };
+
     private readonly ILocalizationService _l;
+    private readonly IAppEnvironment _environment;
+    private readonly HttpClient _http;
     private bool _checkedThisSession;
 
-    public UpdateService(ILocalizationService localization) => _l = localization;
+    public UpdateService(ILocalizationService localization, IAppEnvironment environment)
+        : this(localization, environment, SharedHttp)
+    {
+    }
 
-    public async Task CheckAndPromptAsync(Page page)
+    public UpdateService(ILocalizationService localization, IAppEnvironment environment, HttpClient http)
+    {
+        _l = localization;
+        _environment = environment;
+        _http = http;
+    }
+
+    public async Task CheckAndPromptAsync(IDialogService dialogs)
     {
         if (_checkedThisSession)
             return;
@@ -28,23 +40,22 @@ public class UpdateService
 
         try
         {
-            var json = await Http.GetStringAsync(AppcastUrl);
+            var json = await _http.GetStringAsync(AppcastUrl);
             var manifest = JsonSerializer.Deserialize<Appcast>(json);
             if (manifest?.Version is null)
                 return;
 
-            var current = AppInfo.Current.VersionString;
+            var current = _environment.VersionString;
             if (CompareVersions(manifest.Version, current) <= 0)
                 return; // ya se esta en la ultima version (o mas nueva)
 
-            var wantsUpdate = await ModernDialog.AlertAsync(
-                page,
+            var wantsUpdate = await dialogs.AlertAsync(
                 _l["UpdateTitle"],
                 string.Format(_l.CurrentCulture, _l["UpdateBody"], manifest.Version, current),
                 _l["UpdateNow"], _l["UpdateLater"]);
 
             if (wantsUpdate && !string.IsNullOrWhiteSpace(manifest.Url))
-                await Browser.Default.OpenAsync(new Uri(manifest.Url), BrowserLaunchMode.SystemPreferred);
+                await _environment.OpenUrlAsync(new Uri(manifest.Url));
         }
         catch
         {
@@ -53,7 +64,7 @@ public class UpdateService
     }
 
     /// <summary>Compara versiones numericas por partes ("2026.07.19.0"). &gt;0 si a es mas nueva que b.</summary>
-    private static int CompareVersions(string a, string b)
+    public static int CompareVersions(string a, string b)
     {
         var pa = Parts(a);
         var pb = Parts(b);

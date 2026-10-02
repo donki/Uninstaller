@@ -1,29 +1,19 @@
-﻿using System.Globalization;
 using Microsoft.Extensions.Logging;
-using SocShared;
 using Uninstaller.Helpers;
 using Uninstaller.Models;
 using Uninstaller.Services;
+using Uninstaller.ViewModels;
 
 namespace Uninstaller.Pages;
 
-public partial class MainPage : ContentPage
+/// <summary>Lista de aplicaciones: enlace fino con <see cref="MainViewModel"/>, que tiene la logica.</summary>
+public partial class MainPage : ContentPage, IMainView
 {
     private readonly ILocalizationService _l;
     private readonly ISettingsService _settings;
-    private readonly IAppInventoryService _inventory;
-    private readonly IToastService _toast;
     private readonly UpdateService _update;
-    private readonly ILogger<MainPage> _logger;
-
-    private List<InstalledApp> _apps = new();
-
-    /// <summary>Lo que se esta viendo: <see cref="_apps"/> pasado por el buscador.</summary>
-    private List<InstalledApp> _visible = new();
-
-    private string _search = string.Empty;
-    private bool _isBusy;
-    private bool _loadedOnce;
+    private readonly IDialogService _dialogs;
+    private readonly MainViewModel _vm;
 
     public MainPage()
     {
@@ -31,9 +21,14 @@ public partial class MainPage : ContentPage
 
         _l = ServiceHelper.GetRequiredService<ILocalizationService>();
         _settings = ServiceHelper.GetRequiredService<ISettingsService>();
-        _inventory = ServiceHelper.GetRequiredService<IAppInventoryService>();
-        _toast = ServiceHelper.GetRequiredService<IToastService>();
         _update = ServiceHelper.GetRequiredService<UpdateService>();
+        _dialogs = new PageDialogService(this);
+        _vm = new MainViewModel(_l, _settings,
+            ServiceHelper.GetRequiredService<IAppInventoryService>(),
+            ServiceHelper.GetRequiredService<IToastService>(),
+            _dialogs, this,
+            ServiceHelper.GetRequiredService<ILogger<MainPage>>(),
+            isWindows: DeviceInfo.Platform == DevicePlatform.WinUI);
 #if WINDOWS
         // Espacio en disco: solo en Windows (en Android haria falta el permiso de todo el almacenamiento).
         HeaderButtons.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -47,350 +42,93 @@ public partial class MainPage : ContentPage
             ToastStrip.IsVisible = false;
         };
 #endif
-        _logger = ServiceHelper.GetRequiredService<ILogger<MainPage>>();
-
+        _vm.Changed += (_, _) => Render();
         _l.LanguageChanged += (_, _) => ApplyTexts();
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-
-        ApplyShowSystemState();
         ApplyTexts();
-
-        if (!_loadedOnce)
-        {
-            _loadedOnce = true;
-            await LoadAppsAsync();
-        }
+        await _vm.AppearingAsync();
 
         // Comprobacion de version al arrancar (constitucion 15): no bloqueante.
-        _ = _update.CheckAndPromptAsync(this);
+        _ = _update.CheckAndPromptAsync(_dialogs);
     }
 
     private void ApplyTexts()
     {
         Title = _l["AppName"];
-        // Los botones de la cabecera son solo icono: el texto va a la ayuda contextual, que
-        // es lo unico que queda para explicarlos.
-        SemanticProperties.SetDescription(SortButton, _l["SortBy"]);
-        SemanticProperties.SetDescription(RefreshButton, _l["Refresh"]);
-        SemanticProperties.SetDescription(SearchButton, _l["SearchPlaceholder"]);
-        SemanticProperties.SetDescription(SelectAllButton, _l["SelectAll"]);
-        SemanticProperties.SetDescription(ClearButton, _l["DeselectAll"]);
-        SemanticProperties.SetDescription(ShowSystemButton, _l["ShowSystemApps"]);
-        SemanticProperties.SetDescription(DiskButton, _l["DiskTitle"]);
+        // Los botones de la cabecera son solo icono: el texto va a la ayuda contextual.
+        foreach (var (name, key) in MainViewModel.Descriptions)
+            SemanticProperties.SetDescription((BindableObject)FindByName(name), _l[key]);
         ToolTipProperties.SetText(DiskButton, _l["DiskTitle"]);
-        SearchEntry.Placeholder = _l["SearchPlaceholder"];
-        EmptyLabel.Text = _l["EmptyList"];
-        EmptyHintLabel.Text = _l["EmptyListHint"];
-        LoadingLabel.Text = _l["Loading"];
-        ApplyDetails();
-        UpdateCounts();
+        SearchEntry.Placeholder = _l[MainViewModel.StaticTexts["SearchEntry"]];
+        EmptyLabel.Text = _l[MainViewModel.StaticTexts["EmptyLabel"]];
+        EmptyHintLabel.Text = _l[MainViewModel.StaticTexts["EmptyHintLabel"]];
+        _vm.RefreshTexts();
     }
 
-    private async Task LoadAppsAsync()
+    /// <summary>Vuelca el estado de la logica en los controles.</summary>
+    private void Render()
     {
-        if (_isBusy)
-            return;
-
-        _isBusy = true;
-        LoadingLabel.Text = _l["Loading"];
-        LoadingOverlay.IsVisible = true;
-
-        try
-        {
-            var apps = await _inventory.GetInstalledAppsAsync(_settings.ShowSystemApps);
-            _apps = apps.ToList();
-            ApplyDetails();
-            ApplySort();
-            UpdateCounts();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Could not load the installed apps");
-            await ModernDialog.AlertAsync(this, _l["Error"], string.Format(_l.CurrentCulture, _l["ErrorLoad"], ex.Message), _l["Ok"]);
-        }
-        finally
-        {
-            LoadingOverlay.IsVisible = false;
+        if (!ReferenceEquals(AppsList.ItemsSource, _vm.Visible))
+            AppsList.ItemsSource = _vm.Visible;
+        CountLabel.Text = _vm.CountText;
+        UninstallButton.Text = _vm.UninstallText;
+        UninstallButton.IsEnabled = _vm.UninstallEnabled;
+        LoadingLabel.Text = _vm.LoadingText;
+        LoadingOverlay.IsVisible = _vm.LoadingVisible;
+        UninstallProgress.IsVisible = UninstallDetail.IsVisible = _vm.ProgressVisible;
+        UninstallDetail.Text = _vm.ProgressDetail;
+        if (!_vm.IsBusy)
             ListRefresh.IsRefreshing = false;
-            _isBusy = false;
-        }
+        ShowSystemButton.BackgroundColor = _vm.ShowSystemApps ? (Color)Application.Current!.Resources["Primary"] : Colors.Transparent;
+        ShowSystemButton.ImageSource = _vm.ShowSystemApps ? "ic_system_w.png" : "ic_system.png";
+        SearchRow.IsVisible = _vm.SearchVisible;
+        if (_vm.Search.Length == 0 && !string.IsNullOrEmpty(SearchEntry.Text))
+            SearchEntry.Text = string.Empty;
     }
 
-    // Criterios de orden disponibles, en el mismo orden en que se ofrecen al usuario.
-    private static readonly string[] SortModes = { "install", "updated", "size", "name" };
+    // ============ IMainView ============
 
-    // Nombre visible del criterio, ya traducido (seccion 8: ningun texto fijo en el codigo).
-    private string SortModeName(string mode) => mode switch
-    {
-        "name"    => _l["SortName"],
-        "updated" => _l["SortUpdated"],
-        "size"    => _l["SortSize"],
-        _         => _l["SortInstall"],
-    };
+    public void FocusSearch() => SearchEntry.Focus();
 
-    // Ordena la lista segun el criterio guardado y refresca el binding.
-    private void ApplySort()
-    {
-        _apps = ListRules.Sort(_apps, _settings.SortMode);
-        ApplyFilter();
-    }
+    public void UnfocusSearch() => SearchEntry.Unfocus();
 
-    /// <summary>
-    /// Deja en la lista solo lo que casa con lo escrito, por nombre visible o por paquete: quien
-    /// busca «whatsapp» y quien busca «com.whatsapp» quieren lo mismo.
-    /// </summary>
-    private void ApplyFilter()
-    {
-        _visible = ListRules.Filter(_apps, _search);
+    public Task AnimateProgressAsync(double value) => UninstallProgress.ProgressTo(value, 150, Easing.Linear);
 
-        AppsList.ItemsSource = _visible;
-    }
+    /// <summary>Atras (Mobile 7): lo que hay abierto encima se cierra antes de salir.</summary>
+    protected override bool OnBackButtonPressed() => _vm.HandleBack() || base.OnBackButtonPressed();
 
-    private void OnSearchTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        _search = e.NewTextValue ?? string.Empty;
-        ApplyFilter();
-        UpdateCounts();
-    }
+    // ============ Toques ============
 
-    // Compone la linea de detalle de cada fila: fecha de instalacion, ultima actualizacion y
-    // tamano. Se rehace al cambiar de idioma porque el formato depende de la cultura.
-    private void ApplyDetails()
-    {
-        var culture = _l.CurrentCulture;
-        // Ano de dos cifras: la linea entera tiene que caber en el ancho de la fila.
-        var dateFormat = ListRules.CompactDatePattern(culture);
+    private void OnSearchTextChanged(object? sender, TextChangedEventArgs e) => _vm.SetSearch(e.NewTextValue);
 
-        foreach (var app in _apps)
-        {
-            var size = FormatSize(app.SizeBytes, culture);
-            var installed = app.InstallDate == DateTime.MinValue ? "—" : app.InstallDate.ToString(dateFormat, culture);
-
-            // La mayoria de apps nunca se actualizan: repetir la misma fecha solo gasta espacio.
-            if (app.UpdatedDate == DateTime.MinValue || app.UpdatedDate.Date == app.InstallDate.Date)
-            {
-                app.Details = string.Format(culture, _l["AppDetailsNoUpdate"], installed, size);
-                continue;
-            }
-
-            app.Details = string.Format(
-                culture,
-                _l["AppDetails"],
-                installed,
-                app.UpdatedDate.ToString(dateFormat, culture),
-                size);
-        }
-    }
-
-    private static string FormatSize(long bytes, CultureInfo culture) => ListRules.AppSize(bytes, culture);
-
-    private async void OnSortClicked(object? sender, EventArgs e)
-    {
-        // El criterio activo se marca con ✓ para que se vea cual esta aplicado.
-        var current = _settings.SortMode;
-        var options = SortModes
-            .Select(m => m == current ? $"✓ {SortModeName(m)}" : SortModeName(m))
-            .ToArray();
-
-        var choice = await ModernDialog.ActionSheetAsync(this, _l["SortBy"], _l["Cancel"], options);
-        if (string.IsNullOrEmpty(choice))
-            return;
-
-        var index = Array.IndexOf(options, choice);
-        if (index < 0)
-            return;
-
-        _settings.SortMode = SortModes[index];
-        ApplySort();
-        UpdateCounts();
-    }
-
-    private void UpdateCounts()
-    {
-        // El contador habla de lo que se ve; el de seleccionadas, de todas, porque se desinstalan
-        // todas las marcadas aunque el buscador las haya dejado fuera de la vista.
-        var total = _visible.Count;
-        var selected = _apps.Count(a => a.IsSelected);
-
-        // Una sola linea: «184 aplicaciones instaladas · por Fecha de instalacion». El titulo
-        // aparte se quito para dejar sitio a la lista.
-        var totalText = total == 1
-            ? _l["OneInstalledApp"]
-            : string.Format(_l.CurrentCulture, _l["InstalledAppsCount"], total);
-
-        // El criterio de orden se muestra siempre junto al contador: era invisible y no se
-        // adivinaba que el boton ordenaba (nota de autor del 2026-08-01). Sin el «por»: con el
-        // ancho de un movil, «184 aplicaciones instaladas · por Fecha de instalacion» no cabia.
-        var sortText = SortModeName(_settings.SortMode);
-
-        CountLabel.Text = selected > 0
-            ? $"{totalText} · {string.Format(_l.CurrentCulture, _l["SelectedCount"], selected)} · {sortText}"
-            : $"{totalText} · {sortText}";
-
-        UninstallButton.Text = selected > 0
-            ? $"{_l["UninstallSelected"]} ({selected})"
-            : _l["UninstallSelected"];
-        UninstallButton.IsEnabled = selected > 0 && !_isBusy;
-    }
+    private async void OnSortClicked(object? sender, EventArgs e) => await _vm.ChooseSortAsync();
 
     private void OnRowTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is Element { BindingContext: InstalledApp app })
-            app.IsSelected = !app.IsSelected;
         // El CheckBox refleja el cambio por binding y dispara OnItemCheckedChanged.
+        if (sender is Element { BindingContext: InstalledApp app })
+            _vm.ToggleRow(app);
     }
 
-    private void OnItemCheckedChanged(object? sender, CheckedChangedEventArgs e) => UpdateCounts();
+    private void OnItemCheckedChanged(object? sender, CheckedChangedEventArgs e) => _vm.UpdateCounts();
 
-    private void OnSelectAllClicked(object? sender, EventArgs e)
-    {
-        // Solo lo que se esta viendo: marcar de golpe lo que el buscador esconde seria una trampa.
-        foreach (var app in _visible)
-            app.IsSelected = true;
-        UpdateCounts();
-    }
+    private void OnSelectAllClicked(object? sender, EventArgs e) => _vm.SelectAllVisible();
 
-    private void OnClearClicked(object? sender, EventArgs e)
-    {
-        foreach (var app in _apps)
-            app.IsSelected = false;
-        UpdateCounts();
-    }
+    private void OnClearClicked(object? sender, EventArgs e) => _vm.ClearSelection();
 
-    private async void OnShowSystemClicked(object? sender, EventArgs e)
-    {
-        _settings.ShowSystemApps = !_settings.ShowSystemApps;
-        ApplyShowSystemState();
-        await LoadAppsAsync();
-    }
+    private async void OnShowSystemClicked(object? sender, EventArgs e) => await _vm.ToggleShowSystemAsync();
 
-    /// <summary>El conmutador de apps del sistema se pinta relleno cuando esta activo.</summary>
-    private void ApplyShowSystemState()
-    {
-        var on = _settings.ShowSystemApps;
-        ShowSystemButton.BackgroundColor = on ? (Color)Application.Current!.Resources["Primary"] : Colors.Transparent;
-        ShowSystemButton.ImageSource = on ? "ic_system_w.png" : "ic_system.png";
-    }
+    private void OnSearchClicked(object? sender, EventArgs e) => _vm.ToggleSearch();
 
-    /// <summary>
-    /// Atras (constitucion Mobile 7): lo que hay abierto encima se cierra antes de salir. Primero el
-    /// buscador (se pliega y deja de filtrar), despues la seleccion; solo entonces decide el Shell.
-    /// </summary>
-    protected override bool OnBackButtonPressed()
-    {
-        if (SearchRow.IsVisible)
-        {
-            OnSearchClicked(null, EventArgs.Empty);
-            return true;
-        }
-
-        if (_apps.Any(a => a.IsSelected))
-        {
-            OnClearClicked(null, EventArgs.Empty);
-            return true;
-        }
-
-        return base.OnBackButtonPressed();
-    }
-
-    // La lupa despliega el buscador; al plegarlo se vacia el filtro, que si no se quedaba
-    // filtrando sin que se viera por que faltaban aplicaciones.
-    private void OnSearchClicked(object? sender, EventArgs e)
-    {
-        var show = !SearchRow.IsVisible;
-        SearchRow.IsVisible = show;
-
-        if (show)
-        {
-            SearchEntry.Focus();
-            return;
-        }
-
-        SearchEntry.Unfocus();
-        SearchEntry.Text = string.Empty;
-    }
-
-    private async void OnRefreshClicked(object? sender, EventArgs e) => await LoadAppsAsync();
+    private async void OnRefreshClicked(object? sender, EventArgs e) => await _vm.LoadAppsAsync();
 
     private async void OnDiskClicked(object? sender, EventArgs e) => await Shell.Current.GoToAsync("//DiskUsagePage");
 
-    private async void OnRefreshing(object? sender, EventArgs e) => await LoadAppsAsync();
+    private async void OnRefreshing(object? sender, EventArgs e) => await _vm.LoadAppsAsync();
 
-    private async void OnUninstallSelectedClicked(object? sender, EventArgs e)
-    {
-        var selected = _apps.Where(a => a.IsSelected).ToList();
-        if (selected.Count == 0)
-        {
-            await ModernDialog.AlertAsync(this, _l["ConfirmUninstallTitle"], _l["NothingSelected"], _l["Ok"]);
-            return;
-        }
-
-        var confirm = await ModernDialog.AlertAsync(
-            this,
-            _l["ConfirmUninstallTitle"],
-            string.Format(_l.CurrentCulture, _l[DeviceInfo.Platform == DevicePlatform.WinUI ? "ConfirmUninstallManyWindows" : "ConfirmUninstallMany"], selected.Count),
-            _l["Continue"], _l["Cancel"]);
-
-        if (!confirm)
-            return;
-
-        // Windows: desatendido (sin preguntas) donde el instalador lo admite, o con el asistente de
-        // cada uno. Se pregunta solo si alguno de los marcados lo admite; en Android no hay opcion.
-        var unattended = false;
-        var quiet = selected.Count(a => a.SupportsUnattended);
-        if (DeviceInfo.Platform == DevicePlatform.WinUI && quiet > 0)
-        {
-            unattended = await ModernDialog.AlertAsync(
-                this,
-                _l["UnattendedTitle"],
-                string.Format(_l.CurrentCulture, _l["UnattendedBody"], quiet, selected.Count),
-                _l["Unattended"], _l["WithWizard"]);
-        }
-
-        // Progreso a la vista mientras dura: cual va (n de N), su nombre y la barra. Atendido o
-        // desatendido, entre un desinstalador y el siguiente la pantalla no puede quedarse muda.
-        LoadingLabel.Text = _l["Uninstalling"];
-        UninstallProgress.Progress = 0;
-        UninstallProgress.IsVisible = true;
-        UninstallDetail.IsVisible = true;
-        LoadingOverlay.IsVisible = true;
-
-        var done = 0;
-        var index = 0;
-        foreach (var app in selected)
-        {
-            index++;
-            UninstallDetail.Text = string.Format(_l.CurrentCulture, _l["UninstallingItem"], index, selected.Count, app.Label);
-            await UninstallProgress.ProgressTo((index - 1) / (double)selected.Count, 150, Easing.Linear);
-            try
-            {
-                // Android exige la confirmacion del usuario por cada app (sin borrado masivo silencioso);
-                // en Windows cada programa abre su propio desinstalador, tambien uno detras de otro.
-                if (await _inventory.UninstallAsync(app.PackageName, unattended))
-                    done++;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Could not uninstall {Package}", app.PackageName);
-                await ModernDialog.AlertAsync(
-                    this,
-                    _l["Error"],
-                    string.Format(_l.CurrentCulture, _l["ErrorUninstall"], app.Label, ex.Message),
-                    _l["Ok"]);
-            }
-        }
-
-        await UninstallProgress.ProgressTo(1, 150, Easing.Linear);
-        UninstallProgress.IsVisible = false;
-        UninstallDetail.IsVisible = false;
-        LoadingOverlay.IsVisible = false;
-
-        // Se refresca la lista al volver para reflejar lo que realmente quedo instalado.
-        await LoadAppsAsync();
-        _toast.Show(string.Format(_l.CurrentCulture, _l["UninstallDone"], done, selected.Count));
-    }
+    private async void OnUninstallSelectedClicked(object? sender, EventArgs e) => await _vm.UninstallSelectedAsync();
 }

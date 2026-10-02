@@ -2,6 +2,29 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.10.01.00 — La lógica de las pantallas, a clases con pruebas
+
+`versionCode`: 2026100100 · Windows `2026.10.1.0` (MSIX `2026.10.100.0`)
+
+- **Cobertura de toda la app: del 28,5 al 50,8 %** (General §8.6; 267 pruebas, antes 168). La lógica
+  de las pantallas sale a `ViewModels/`: la lista de aplicaciones (`MainViewModel`: cargar, ordenar,
+  buscar, marcar, desinstalar con progreso, atrás), el espacio en disco (`DiskUsageViewModel`:
+  unidades, escaneo, árbol, vistas, duplicados, mapa, copiar, papelera con permisos y riesgo,
+  exportar a CSV), Ajustes y Acerca de. Las páginas quedan como enlace fino que vuelca el estado en
+  los controles. Lo que depende del sistema va detrás de interfaces con su doble en las pruebas:
+  diálogos (`IDialogService`), versión/navegador/correo (`IAppEnvironment`), bandeja y arranque con
+  Windows (`IDesktopIntegration`). La lectura de las claves `Uninstall` del registro sale a
+  `Services/UninstallRegistry.cs` y la comprobación de versión recibe el cliente HTTP. El usuario
+  no ve ningún cambio.
+- **Medida corregida**: el `coverlet.runsettings` excluía `CompilerGeneratedAttribute`, que deja
+  fuera los cuerpos de los métodos `async` y de las lambdas. Con la medida vieja la versión anterior
+  daba 28,0 %; con la corregida, 28,5 %.
+
+### English
+- Screen logic moved into testable view-models; registry reading, dialogs and system services
+  behind testable classes and interfaces. No visible change. 267 tests; whole-app coverage 50.8 %
+  (was 28.5 %).
+
 ## 2026.09.30.00 — El mapa de espacio ya no agranda las subcarpetas
 
 `versionCode`: 2026093000 · Windows `2026.9.30.0` (MSIX `2026.9.3000.0`)

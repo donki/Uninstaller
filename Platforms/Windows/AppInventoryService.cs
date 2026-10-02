@@ -25,7 +25,6 @@ namespace Uninstaller.Platforms.Windows;
 /// </remarks>
 public class AppInventoryService : IAppInventoryService
 {
-    private const string Win32Prefix = "win32:";
     private const string MsixPrefix = "msix:";
 
     // Como desinstalar cada identificador de la ultima lista (la orden del registro o el nombre
@@ -87,49 +86,14 @@ public class AppInventoryService : IAppInventoryService
                     using var key = root.OpenSubKey(name);
                     if (key is null)
                         continue;
-                    var display = key.GetValue("DisplayName") as string;
-                    var quiet = key.GetValue("QuietUninstallString") as string;
-                    var uninstall = key.GetValue("UninstallString") as string ?? quiet;
-                    if (string.IsNullOrWhiteSpace(display) || string.IsNullOrWhiteSpace(uninstall))
+                    var read = UninstallRegistry.Read(name, n => key.GetValue(n), includeSystem, seen,
+                        UninstallRegistry.DetectInstaller, raw => ParseInstallDate(raw, key), ExtractIcon);
+                    if (read is null)
                         continue;
-                    if (string.IsNullOrWhiteSpace(quiet))
-                        quiet = null;
-                    // Las actualizaciones (KB…) y los parches de MSI no son programas.
-                    if ((key.GetValue("ParentKeyName") as string)?.Length > 0 || (key.GetValue("ReleaseType") as string) is "Update" or "Hotfix" or "Security Update")
-                        continue;
-                    var isSystem = Convert.ToInt32(key.GetValue("SystemComponent", 0), CultureInfo.InvariantCulture) == 1;
-                    if (isSystem && !includeSystem)
-                        continue;
-                    // El mismo programa puede estar en la clave de 64 y en la de 32 bits.
-                    var version = key.GetValue("DisplayVersion") as string ?? string.Empty;
-                    if (!seen.Add(display + "|" + version))
-                        continue;
-
-                    var id = Win32Prefix + name;
-                    var isMsi = UninstallCommands.IsMsi(Convert.ToInt32(key.GetValue("WindowsInstaller", 0), CultureInfo.InvariantCulture), uninstall);
-                    var entry = new Win32Entry(hive, path + "\\" + name, uninstall, quiet, isMsi ? InstallerKind.Msi : DetectInstaller(uninstall));
-                    _win32[id] = entry;
-
-                    var publisher = key.GetValue("Publisher") as string ?? string.Empty;
-                    var installed = ParseInstallDate(key.GetValue("InstallDate") as string, key);
-                    var sizeKb = Convert.ToInt64(key.GetValue("EstimatedSize", 0L), CultureInfo.InvariantCulture);
-                    var location = key.GetValue("InstallLocation") as string;
-                    var app = new InstalledApp
-                    {
-                        PackageName = id,
-                        Label = version.Length > 0 ? $"{display} {version}" : display,
-                        IsSystem = isSystem,
-                        InstallDate = installed,
-                        UpdatedDate = installed,
-                        SizeBytes = sizeKb * 1024,
-                        Icon = ExtractIcon(key.GetValue("DisplayIcon") as string, uninstall),
-                        Publisher = publisher,
-                        SupportsUnattended = entry.SupportsUnattended,
-                    };
-                    result.Add(app);
-                    // Sin EstimatedSize, se mide la carpeta de instalacion (si la declara).
-                    if (sizeKb <= 0 && !string.IsNullOrWhiteSpace(location))
-                        folders[app] = location.Trim().Trim('"');
+                    _win32[read.App.PackageName] = new Win32Entry(hive, path + "\\" + name, read.UninstallString, read.QuietUninstallString, read.Installer);
+                    result.Add(read.App);
+                    if (read.FolderToMeasure is { } folder)
+                        folders[read.App] = folder;
                 }
                 catch (Exception)
                 {
@@ -222,30 +186,6 @@ public class AppInventoryService : IAppInventoryService
     private static (string File, string Arguments) UninstallCommand(Win32Entry entry, bool unattended) =>
         UninstallCommands.Build(entry.UninstallString, entry.QuietUninstallString, entry.Installer, unattended);
 
-    /// <summary>
-    /// Inno Setup y NSIS se reconocen por una marca en el propio ejecutable de desinstalar (los dos
-    /// la llevan en claro en su cabecera). Se mira solo el primer trozo del fichero.
-    /// </summary>
-    private static InstallerKind DetectInstaller(string uninstall)
-    {
-        try
-        {
-            var (file, _) = SplitCommand(uninstall);
-            if (!File.Exists(file))
-                return InstallerKind.Unknown;
-            using var stream = File.OpenRead(file);
-            var buffer = new byte[Math.Min(stream.Length, 2L * 1024 * 1024)];
-            var read = stream.Read(buffer, 0, buffer.Length);
-            var text = System.Text.Encoding.ASCII.GetString(buffer, 0, read);
-            return UninstallCommands.DetectFromHeader(Path.GetFileName(file), text, File.Exists(Path.ChangeExtension(file, ".dat")));
-        }
-        catch (Exception)
-        {
-            // Sin acceso al fichero: se trata como desconocido y va con asistente.
-        }
-        return InstallerKind.Unknown;
-    }
-
     private static bool KeyExists(Win32Entry entry)
     {
         using var key = entry.Hive.OpenSubKey(entry.KeyPath);
@@ -257,30 +197,7 @@ public class AppInventoryService : IAppInventoryService
 
     // ------------------------------------------------------------------ MSIX (PackageManager)
 
-    /// <summary>
-    /// Lo que ocupa en disco cada carpeta de instalacion, en paralelo: son cientos de carpetas y
-    /// recorrerlas una detras de otra retrasaria la lista varios segundos.
-    /// </summary>
-    private static void MeasureFolders(Dictionary<InstalledApp, string> folders)
-    {
-        Parallel.ForEach(folders, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pair =>
-        {
-            try
-            {
-                if (!Directory.Exists(pair.Value))
-                    return;
-                long total = 0;
-                var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
-                foreach (var file in new DirectoryInfo(pair.Value).EnumerateFiles("*", options))
-                    total += file.Length;
-                pair.Key.SizeBytes = total;
-            }
-            catch (Exception)
-            {
-                // Carpeta sin permiso o desaparecida: se queda sin tamaño.
-            }
-        });
-    }
+    private static void MeasureFolders(Dictionary<InstalledApp, string> folders) => UninstallRegistry.MeasureFolders(folders);
 
     private static void ReadPackages(bool includeSystem, List<InstalledApp> result, Dictionary<InstalledApp, string> folders)
     {

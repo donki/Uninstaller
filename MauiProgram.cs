@@ -29,6 +29,8 @@ public static class MauiProgram
         // Servicios (constitucion 5: inyeccion de dependencias para todos los servicios).
         builder.Services.AddSingleton<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
+        builder.Services.AddSingleton<IAppEnvironment, MauiAppEnvironment>();
+        builder.Services.AddSingleton<IDesktopIntegration, DesktopIntegration>();
         builder.Services.AddSingleton<UpdateService>();
 #if ANDROID
         builder.Services.AddSingleton<IAppInventoryService, Platforms.Android.AppInventoryService>();
