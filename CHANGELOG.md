@@ -2,6 +2,12 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## Sin publicar
+
+- En Windows, el menú de la bandeja tiene el aspecto común de las apps sOC (General §6.14): un menú
+  WinUI con tarjeta de esquinas redondeadas, iconos y los colores del tema claro u oscuro, en lugar
+  del menú gris del sistema.
+
 ## 2026.10.01.00 — La lógica de las pantallas, a clases con pruebas
 
 `versionCode`: 2026100100 · Windows `2026.10.1.0` (MSIX `2026.10.100.0`)

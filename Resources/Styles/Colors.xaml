@@ -39,5 +39,11 @@
     <!-- Recuadro de advertencia del aviso legal (rojo muy tenue) -->
     <Color x:Key="WarningSurfaceLight">#FDF2F2</Color>
     <Color x:Key="WarningSurfaceDark">#2B1E1E</Color>
+    <!-- Menus de Windows (General 6.14): fondo del elemento bajo el raton e indigo de los iconos,
+         mas claro en oscuro para que se lea. Los mismos valores que sOC ScreenShare. -->
+    <Color x:Key="SelectionSurfaceLight">#E4E1FF</Color>
+    <Color x:Key="SelectionSurfaceDark">#2E2A55</Color>
+    <Color x:Key="PrimaryTextLight">#3525CD</Color>
+    <Color x:Key="PrimaryTextDark">#A9A3FF</Color>
 
 </ResourceDictionary>
