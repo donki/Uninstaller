@@ -2,11 +2,19 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
-## Sin publicar
+## 2026.10.16.00 — El menú de la bandeja, como en el resto de apps sOC
 
+`versionCode`: 2026101600 · Windows `2026.10.16.0` (MSIX `2026.10.1600.0`)
+
+- **En Windows, el menú del icono junto al reloj tiene el mismo aspecto que en el resto de
+  aplicaciones sOC, con iconos, en tema claro y oscuro.**
 - En Windows, el menú de la bandeja tiene el aspecto común de las apps sOC (General §6.14): un menú
   WinUI con tarjeta de esquinas redondeadas, iconos y los colores del tema claro u oscuro, en lugar
   del menú gris del sistema.
+
+### English
+- On Windows, the menu of the icon next to the clock looks the same as in the other sOC apps,
+  with icons, in light and dark theme.
 
 ## 2026.10.01.00 — La lógica de las pantallas, a clases con pruebas
 
