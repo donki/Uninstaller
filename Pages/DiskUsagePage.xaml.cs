@@ -13,6 +13,7 @@ public partial class DiskUsagePage : ContentPage, IDiskView
 {
     private readonly ILocalizationService _l;
     private readonly DiskUsageViewModel _vm;
+    private readonly IShellActions _shell;
     private int _drawnMap = -1;
 
     /// <summary>Ruta que llega por linea de ordenes (--disk ruta): se escanea al abrir la pagina. Vacia = solo abrir.</summary>
@@ -25,7 +26,8 @@ public partial class DiskUsagePage : ContentPage, IDiskView
     {
         InitializeComponent();
         _l = ServiceHelper.GetRequiredService<ILocalizationService>();
-        _vm = new DiskUsageViewModel(_l, ServiceHelper.GetRequiredService<IShellActions>(),
+        _shell = ServiceHelper.GetRequiredService<IShellActions>();
+        _vm = new DiskUsageViewModel(_l, _shell,
             ServiceHelper.GetRequiredService<IToastService>(), new PageDialogService(this), this);
         TreeList.ItemsSource = _vm.Rows;
         BindableLayout.SetItemsSource(QueueList, _vm.Queue.Jobs);
@@ -159,8 +161,111 @@ public partial class DiskUsagePage : ContentPage, IDiskView
 
     private void OnExpanderTapped(object? sender, TappedEventArgs e)
     {
-        if ((sender as BindableObject)?.BindingContext is FolderNode node)
-            _vm.Toggle(node);
+        if ((sender as BindableObject)?.BindingContext is not FolderNode node)
+            return;
+#if WINDOWS
+        // Al meter las filas de la rama la lista de WinUI volvia arriba: se deja donde estaba.
+        var scroller = FindNative<Microsoft.UI.Xaml.Controls.ScrollViewer>(TreeList.Handler?.PlatformView as Microsoft.UI.Xaml.DependencyObject);
+        var offset = scroller?.VerticalOffset;
+        _vm.Toggle(node);
+        if (scroller is not null && offset is { } y)
+        {
+            scroller.ChangeView(null, y, null, true);
+            Dispatcher.Dispatch(() => scroller.ChangeView(null, y, null, true));
+        }
+#else
+        _vm.Toggle(node);
+#endif
+    }
+
+    // ============ Boton derecho ============
+
+    /// <summary>Menu del boton derecho de una fila: una carpeta del arbol o un fichero.</summary>
+    private void OnRowSecondaryTapped(object? sender, TappedEventArgs e)
+    {
+#if WINDOWS
+        if (sender is not View view || view.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement native)
+            return;
+        var menu = view.BindingContext switch
+        {
+            FolderNode node => FolderMenu(node),
+            FileRow row => FileMenu(row.FullPath),
+            _ => null,
+        };
+        if (menu is null)
+            return;
+        var at = e.GetPosition(view) ?? new Point(0, 0);
+        menu.ShowAt(native, new Microsoft.UI.Xaml.Controls.Primitives.FlyoutShowOptions { Position = new global::Windows.Foundation.Point(at.X, at.Y) });
+#endif
+    }
+
+#if WINDOWS
+    private IntPtr WindowHandle => Window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window w ? WinRT.Interop.WindowNative.GetWindowHandle(w) : IntPtr.Zero;
+
+    /// <summary>Carpeta: actualizar su rama, verla en el Explorador, el menu de Windows, copiar la ruta y borrarla.</summary>
+    private Microsoft.UI.Xaml.Controls.MenuFlyout FolderMenu(FolderNode node)
+    {
+        var m = new Platforms.Windows.SocMenu(Platforms.Windows.SocMenu.IsDark);
+        var path = node.FullPath;
+        m.Flyout.Items.Add(m.Item(_l["DiskRefreshBranch"], "\uE72C", () => _vm.RefreshBranch(node)));
+        m.Flyout.Items.Add(m.Separator());
+        m.Flyout.Items.Add(m.Item(_l["DiskOpen"], "\uE838", () => Try(() => _shell.RevealInExplorer(path))));
+        m.Flyout.Items.Add(m.Item(_l["DiskMoreOptions"], "\uE712", () => Try(() => Platforms.Windows.ShellOpen.ShowExplorerMenu(WindowHandle, path))));
+        m.Flyout.Items.Add(m.Item(_l["DiskCopy"], "\uE8C8", () => Safe(() => _vm.CopyAsync([path]))));
+        m.Flyout.Items.Add(m.Separator());
+        m.Flyout.Items.Add(m.Item(_l["DiskDelete"], "\uE74D", () => Safe(() => _vm.DeleteAsync([path])),
+            enabled: !ReferenceEquals(node, _vm.Root), danger: true));
+        return m.Flyout;
+    }
+
+    /// <summary>
+    /// Fichero: abrirlo, abrirlo con uno de los programas que Windows tiene para ese tipo (o elegir
+    /// otro), verlo en el Explorador, el menu de Windows, copiar la ruta y borrarlo.
+    /// </summary>
+    private Microsoft.UI.Xaml.Controls.MenuFlyout FileMenu(string path)
+    {
+        var m = new Platforms.Windows.SocMenu(Platforms.Windows.SocMenu.IsDark);
+        m.Flyout.Items.Add(m.Item(_l["DiskOpenFile"], "\uE8E5", () => Try(() => Platforms.Windows.ShellOpen.Open(path))));
+        var openWith = m.SubItem(_l["DiskOpenWith"], "\uE7AC");
+        foreach (var app in Platforms.Windows.ShellOpen.AppsFor(path))
+            openWith.Items.Add(m.ImageItem(app.Name, app.IconFile, "\uE7AC", () => Try(() => app.Open(path))));
+        if (openWith.Items.Count > 0)
+            openWith.Items.Add(m.Separator());
+        openWith.Items.Add(m.Item(_l["DiskChooseApp"], "\uE712", () => Try(() => Platforms.Windows.ShellOpen.ChooseApp(WindowHandle, path))));
+        m.Flyout.Items.Add(openWith);
+        m.Flyout.Items.Add(m.Item(_l["DiskOpen"], "\uE838", () => Try(() => _shell.RevealInExplorer(path))));
+        m.Flyout.Items.Add(m.Item(_l["DiskMoreOptions"], "\uE712", () => Try(() => Platforms.Windows.ShellOpen.ShowExplorerMenu(WindowHandle, path))));
+        m.Flyout.Items.Add(m.Item(_l["DiskCopy"], "\uE8C8", () => Safe(() => _vm.CopyAsync([path]))));
+        m.Flyout.Items.Add(m.Separator());
+        m.Flyout.Items.Add(m.Item(_l["DiskDelete"], "\uE74D", () => Safe(() => _vm.DeleteAsync([path])), danger: true));
+        return m.Flyout;
+    }
+
+    private static T? FindNative<T>(Microsoft.UI.Xaml.DependencyObject? element) where T : Microsoft.UI.Xaml.DependencyObject
+    {
+        if (element is null)
+            return null;
+        if (element is T found)
+            return found;
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(element);
+        for (var i = 0; i < count; i++)
+            if (FindNative<T>(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(element, i)) is { } child)
+                return child;
+        return null;
+    }
+#endif
+
+    /// <summary>Una accion del sistema (abrir, Explorador): si falla, se explica.</summary>
+    private void Try(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            _ = new PageDialogService(this).AlertAsync(_l["Error"], ex.Message, _l["Ok"]);
+        }
     }
 
     // Al pasar el raton, el desplegable se marca: se ve que ahi se puede pulsar.

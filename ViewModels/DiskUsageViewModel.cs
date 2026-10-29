@@ -449,8 +449,7 @@ public class DiskUsageViewModel
             var dateFormat = culture.DateTimeFormat.ShortDatePattern;
             foreach (var g in groups)
             {
-                g.Title = string.Format(culture, _l["DiskDuplicateTitle"], g.Files[0].Name, g.Files.Count, FormatSize(g.Size));
-                g.Detail = string.Format(culture, _l["DiskDuplicateDetail"], FormatSize(g.Wasted));
+                DescribeGroup(g);
                 g.Rows.AddRange(g.Files.Select(f => new FileRow(f, FormatSize(f.Size), f.Modified.ToString(dateFormat, culture), 1) { Icon = _shell.IconFor(f.FullPath, isFolder: false) }));
             }
             Duplicates = groups;
@@ -613,9 +612,11 @@ public class DiskUsageViewModel
         catch (Exception ex) { await _dialogs.AlertAsync(_l["Error"], ex.Message, _l["Ok"]); }
     }
 
-    public async Task CopyAsync()
+    public Task CopyAsync() => CopyAsync(TargetPaths());
+
+    /// <summary>Copia esas rutas al portapapeles, una por linea.</summary>
+    public async Task CopyAsync(IReadOnlyList<string> paths)
     {
-        var paths = TargetPaths();
         if (paths.Count == 0)
             return;
         await _view.SetClipboardTextAsync(string.Join(Environment.NewLine, paths));
@@ -650,10 +651,13 @@ public class DiskUsageViewModel
         return message;
     }
 
-    public async Task DeleteAsync()
+    public Task DeleteAsync() => DeleteAsync(TargetPaths());
+
+    /// <summary>Borrar esas rutas (desde el boton, lo marcado o elegido; desde el menu del boton derecho, esa fila).</summary>
+    public async Task DeleteAsync(IReadOnlyList<string> targets)
     {
-        // Lo que ya esta en la cola no se vuelve a mandar.
-        var paths = TargetPaths().Where(p => !_queued.Contains(p)).ToList();
+        // Lo que ya esta en la cola no se vuelve a mandar; la raiz escaneada no se borra desde aqui.
+        var paths = targets.Where(p => !_queued.Contains(p) && !(Root is not null && ReferenceEquals(FindNode(Root, p), Root))).ToList();
         if (paths.Count == 0)
             return;
         var culture = _l.CurrentCulture;
@@ -806,9 +810,16 @@ public class DiskUsageViewModel
             _removeAfterScan.AddRange(done);
             return;
         }
+        var branches = new List<FolderNode>();
+        var removedFolders = new List<FolderNode>();
         foreach (var p in done)
-            RemoveFromModel(p, refresh: false);
-        RefreshAfterRemove();
+        {
+            if (RemoveCore(p, out var removed) is { } branch)
+                branches.Add(branch);
+            if (removed is not null)
+                removedFolders.Add(removed);
+        }
+        UpdateBranches(branches, removedFolders, done);
     }
 
     private void ApplyRemovedAfterScan()
@@ -849,11 +860,140 @@ public class DiskUsageViewModel
         public void Report(T value) => report(value);
     }
 
-    /// <summary>Tras borrar: se quita del arbol y se restan los tamanos hacia arriba, sin volver a escanear.</summary>
-    public void RemoveFromModel(string path, bool refresh = true)
+    // ============ Actualizar una rama ============
+
+    /// <summary>
+    /// Vuelve a escanear solo esa carpeta y lo que cuelga de ella (por la cola, en segundo plano) y
+    /// la cambia en el arbol: se corrigen los tamaños de las carpetas de encima y se repintan solo
+    /// esas ramas. Lo desplegado dentro sigue desplegado.
+    /// </summary>
+    public void RefreshBranch(FolderNode node)
     {
         if (Root is null)
             return;
+        var path = node.FullPath;
+        FolderNode? scanned = null;
+        Queue.Enqueue(string.Format(_l.CurrentCulture, _l["DiskRefreshing"], path), async (job, token) =>
+        {
+            scanned = await DiskScanner.ScanAsync(path, new Callback<ScanProgress>(p =>
+                job.Report(string.Format(_l.CurrentCulture, _l["DiskRefreshProgress"], p.Folders, p.Files, FormatSize(p.Bytes)), 0)), token);
+        }, job =>
+        {
+            // Mientras tanto se escaneo todo de nuevo (el arbol es otro): ese escaneo ya lo trae al dia.
+            if (_scan is not null || Root is null || !ReferenceEquals(FindNode(Root, path), node))
+                return Task.CompletedTask;
+            if (job.Error is DirectoryNotFoundException)
+            {
+                // Ya no existe: sale del arbol como si se hubiera borrado.
+                job.Error = null;
+                ApplyRemoved([path]);
+                return Task.CompletedTask;
+            }
+            if (scanned is null || job.CancelRequested || job.Error is not null)
+                return Task.CompletedTask;
+            ReplaceBranch(node, scanned);
+            _toast.Show(string.Format(_l.CurrentCulture, _l["DiskRefreshed"], path));
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>Cambia el contenido de <paramref name="node"/> por lo recien escaneado, sin tocar el resto.</summary>
+    public void ReplaceBranch(FolderNode node, FolderNode scanned)
+    {
+        var size = scanned.Size - node.Size;
+        var files = scanned.FileCount - node.FileCount;
+        var folders = scanned.FolderCount - node.FolderCount;
+        for (var p = node.Parent; p is not null; p = p.Parent)
+        {
+            p.Size += size;
+            p.FileCount += files;
+            p.FolderCount += folders;
+        }
+        // Lo que estaba desplegado dentro sigue desplegado (por ruta: los nodos son nuevos).
+        var expanded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var stack = new Stack<FolderNode>(node.Children);
+        while (stack.Count > 0)
+        {
+            var n = stack.Pop();
+            if (n.IsExpanded)
+                expanded.Add(n.FullPath);
+            foreach (var c in n.Children)
+                stack.Push(c);
+        }
+        node.Size = scanned.Size;
+        node.FileCount = scanned.FileCount;
+        node.FolderCount = scanned.FolderCount;
+        node.LastModified = scanned.LastModified;
+        node.Inaccessible = scanned.Inaccessible;
+        node.Files.Clear();
+        node.Files.AddRange(scanned.Files);
+        node.Children = scanned.Children.Select(c => Graft(c, node, expanded)).ToList();
+
+        // Filas: fuera las de debajo de la carpeta y, si esta desplegada, dentro las nuevas.
+        var index = Rows.IndexOf(node);
+        if (index >= 0)
+        {
+            while (index + 1 < Rows.Count && Rows[index + 1].Depth > node.Depth)
+                Rows.RemoveAt(index + 1);
+            if (node.IsExpanded)
+            {
+                var list = new List<FolderNode>();
+                foreach (var c in node.Children)
+                    ListRules.Flatten(c, list);
+                for (var i = 0; i < list.Count; i++)
+                {
+                    DescribeOne(list[i]);
+                    Rows.Insert(index + 1 + i, list[i]);
+                }
+            }
+        }
+        // Los ficheros de esa rama que ya no estan dejan de contar como duplicados.
+        var prefix = node.FullPath.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+        bool Gone(string f) => f.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !File.Exists(f);
+        if (Duplicates is not null)
+            Duplicates = PruneDuplicates(Duplicates, Gone);
+        Largest = Mode == DiskViewMode.Largest ? BuildLargest() : null;
+        UpdateBranches([node], [], []);
+    }
+
+    /// <summary>Copia de una carpeta escaneada colgando de <paramref name="parent"/> (con su profundidad).</summary>
+    private static FolderNode Graft(FolderNode scanned, FolderNode parent, ISet<string> expanded)
+    {
+        var n = new FolderNode
+        {
+            Name = scanned.Name,
+            FullPath = scanned.FullPath,
+            Parent = parent,
+            Depth = parent.Depth + 1,
+            Size = scanned.Size,
+            FileCount = scanned.FileCount,
+            FolderCount = scanned.FolderCount,
+            LastModified = scanned.LastModified,
+            Inaccessible = scanned.Inaccessible,
+            IsExpanded = expanded.Contains(scanned.FullPath),
+        };
+        n.Files.AddRange(scanned.Files);
+        n.Children = scanned.Children.Select(c => Graft(c, n, expanded)).ToList();
+        return n;
+    }
+
+    /// <summary>Tras borrar: se quita del arbol y se restan los tamanos hacia arriba, sin volver a escanear.</summary>
+    public void RemoveFromModel(string path, bool refresh = true)
+    {
+        var branch = RemoveCore(path, out var removed);
+        if (refresh && branch is not null)
+            UpdateBranches([branch], removed is null ? [] : [removed], [path]);
+    }
+
+    /// <summary>
+    /// Quita la carpeta o el fichero del arbol y resta lo que ocupaba en todas las carpetas de encima.
+    /// Devuelve la carpeta de la que colgaba (de ahi hacia arriba es lo que cambia) o null si no estaba.
+    /// </summary>
+    private FolderNode? RemoveCore(string path, out FolderNode? removedFolder)
+    {
+        removedFolder = null;
+        if (Root is null)
+            return null;
         var node = FindNode(Root, path);
         if (node is not null && node.Parent is not null)
         {
@@ -865,37 +1005,122 @@ public class DiskUsageViewModel
                 p.FileCount -= node.FileCount;
                 p.FolderCount -= node.FolderCount + 1;
             }
+            removedFolder = node;
+            return node.Parent;
         }
-        else
+        var owner = FindNode(Root, Path.GetDirectoryName(path) ?? string.Empty);
+        var file = owner?.Files.FirstOrDefault(f => string.Equals(f.FullPath, path, StringComparison.OrdinalIgnoreCase));
+        if (owner is null || file is null)
+            return null;
+        owner.Files.Remove(file);
+        for (var p = owner; p is not null; p = p.Parent)
         {
-            var owner = FindNode(Root, Path.GetDirectoryName(path) ?? string.Empty);
-            var file = owner?.Files.FirstOrDefault(f => string.Equals(f.FullPath, path, StringComparison.OrdinalIgnoreCase));
-            if (owner is null || file is null)
-                return;
-            owner.Files.Remove(file);
-            for (var p = owner; p is not null; p = p.Parent)
-            {
-                p.Size -= file.Size;
-                p.FileCount -= 1;
-            }
+            p.Size -= file.Size;
+            p.FileCount -= 1;
         }
-        if (refresh)
-            RefreshAfterRemove();
+        return owner;
     }
 
-    /// <summary>Vuelve a pintar las vistas con el arbol ya recortado.</summary>
-    private void RefreshAfterRemove()
+    /// <summary>
+    /// Tras borrar, se repinta solo lo que cambio: salen las filas de lo borrado (y lo que colgaba de
+    /// ello) y se actualizan las carpetas de las ramas donde estaba, de ahi hasta la raiz, con sus
+    /// hijas a la vista (su parte del padre cambia). El resto del arbol no se toca: ni se rehace la
+    /// lista, ni se pliega nada, ni se pierde por donde se iba. Lo mismo en las otras vistas: de los
+    /// ficheros mas grandes y de los duplicados solo se quita lo borrado.
+    /// </summary>
+    private void UpdateBranches(IReadOnlyCollection<FolderNode> branches, IReadOnlyCollection<FolderNode> removedFolders, IReadOnlyCollection<string> removedPaths)
     {
-        if (Root is null)
+        if (Root is null || (branches.Count == 0 && removedFolders.Count == 0))
             return;
-        RebuildRows();
-        Largest = null;
-        Duplicates = null;
-        _selectedDuplicate = null;
-        if (MapRoot is not null && FindNode(Root, MapRoot.FullPath) is null)
+        if (Largest is not null && Mode != DiskViewMode.Largest)
+            Largest = null;
+
+        // 1. Filas de lo borrado: la carpeta y las desplegadas debajo (van seguidas, con mas sangria).
+        foreach (var gone in removedFolders)
+        {
+            var i = Rows.IndexOf(gone);
+            if (i < 0)
+                continue;
+            Rows.RemoveAt(i);
+            while (i < Rows.Count && Rows[i].Depth > gone.Depth)
+                Rows.RemoveAt(i);
+        }
+
+        // 2. Las ramas: cada carpeta de encima de lo borrado, y sus hijas que se ven.
+        var visible = new HashSet<FolderNode>(Rows);
+        var touched = new HashSet<FolderNode>();
+        foreach (var b in branches)
+            for (var n = b; n is not null && touched.Add(n); n = n.Parent) { }
+        foreach (var n in touched)
+        {
+            if (visible.Contains(n))
+                Refresh(n);
+            if (!n.IsExpanded)
+                continue;
+            foreach (var c in n.Children)
+                if (visible.Contains(c) && !touched.Contains(c))
+                    Refresh(c);
+        }
+
+        // 3. Las otras vistas, sin rehacerlas enteras.
+        bool Gone(string path) =>
+            removedPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
+            || removedPaths.Any(r => path.StartsWith(r.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+        if (Largest is not null)
+            Largest = Mode == DiskViewMode.Largest ? Largest.Where(r => !Gone(r.FullPath)).ToList() : null;
+        if (Duplicates is not null)
+            Duplicates = PruneDuplicates(Duplicates, Gone);
+        if (_selectedDuplicate is not null && Gone(_selectedDuplicate.FullPath))
+            _selectedDuplicate = null;
+        if (TreeSelected is FolderNode selected && Gone(selected.FullPath))
+            TreeSelected = null;
+        if (MapRoot is not null && Gone(MapRoot.FullPath))
             MapRoot = Root;
-        MapSelected = null;
-        ShowView(Mode == DiskViewMode.Duplicates ? DiskViewMode.Tree : Mode);
+        if (MapSelected is not null && Gone(MapSelected.FullPath))
+            MapSelected = null;
+        if (Mode is DiskViewMode.Types or DiskViewMode.Age or DiskViewMode.Map)
+            ShowView(Mode);   // agregados y mapa: dependen de todo, se recalculan (es barato)
+        else
+        {
+            UpEnabled = Mode == DiskViewMode.Map && MapRoot?.Parent is not null;
+            UpdateActions();
+        }
+    }
+
+    /// <summary>Repinta una fila: tamaño, detalle, barra (su parte del padre) y desplegable.</summary>
+    private void Refresh(FolderNode n)
+    {
+        DescribeOne(n);
+        n.NotifySizeChanged();
+    }
+
+    /// <summary>Los grupos de duplicados sin lo borrado; el grupo que se queda con una sola copia sobra.</summary>
+    private List<DuplicateGroup> PruneDuplicates(List<DuplicateGroup> groups, Func<string, bool> gone)
+    {
+        var result = new List<DuplicateGroup>();
+        foreach (var g in groups)
+        {
+            if (!g.Files.Any(f => gone(f.FullPath)))
+            {
+                result.Add(g);
+                continue;
+            }
+            var files = g.Files.Where(f => !gone(f.FullPath)).ToList();
+            if (files.Count < 2)
+                continue;
+            var pruned = new DuplicateGroup { Size = g.Size, Files = files };
+            DescribeGroup(pruned);
+            pruned.Rows.AddRange(g.Rows.Where(r => !gone(r.FullPath)));
+            result.Add(pruned);
+        }
+        return result;
+    }
+
+    private void DescribeGroup(DuplicateGroup g)
+    {
+        var culture = _l.CurrentCulture;
+        g.Title = string.Format(culture, _l["DiskDuplicateTitle"], g.Files[0].Name, g.Files.Count, FormatSize(g.Size));
+        g.Detail = string.Format(culture, _l["DiskDuplicateDetail"], FormatSize(g.Wasted));
     }
 
     public static FolderNode? FindNode(FolderNode root, string path)

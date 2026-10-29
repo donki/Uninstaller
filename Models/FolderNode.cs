@@ -78,6 +78,9 @@ public sealed class FolderNode : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpanderOpacity)));
     }
 
+    /// <summary>Tras borrar algo de su rama: su barra (parte del padre) se vuelve a pintar.</summary>
+    public void NotifySizeChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Percent)));
+
     /// <summary>Parte del padre que ocupa esta carpeta (0..1); en la raiz, 1.</summary>
     public double Percent => Parent is null || Parent.Size <= 0 ? 1 : Math.Min(1, Size / (double)Parent.Size);
 

@@ -23,7 +23,6 @@ public sealed class TrayIcon
     private const int WmLButtonDblClk = 0x0203;
     private const int WmTray = 0x8001;   // WM_APP + 1
     private const int ScMinimize = 0xF020;
-    private const string IconFont = "Segoe Fluent Icons, Segoe MDL2 Assets";
 
     private readonly IntPtr _hwnd;
     private readonly WndProc _proc;
@@ -149,94 +148,17 @@ public sealed class TrayIcon
         catch (Exception) { }
     }
 
-    /// <summary>El menu con las medidas y colores de la regla General 6.14, en el tema de la app.</summary>
+    /// <summary>El menu con las medidas y colores de la regla General 6.14 (<see cref="SocMenu"/>), en el tema de la app.</summary>
     private XamlControls.MenuFlyout BuildMenu(bool dark)
     {
-        var card = Brush(dark ? "CardBackgroundDark" : "CardBackgroundLight");
-        var separator = Brush(dark ? "SeparatorDark" : "SeparatorLight");
-        var text = Brush(dark ? "TextPrimaryDark" : "TextPrimaryLight");
-        var theme = dark ? Xaml.ElementTheme.Dark : Xaml.ElementTheme.Light;
-
-        // Contenedor: tarjeta con borde de 1 px, esquinas de 10, relleno de 4, 240 de ancho y sin sombra.
-        var presenterStyle = new Xaml.Style(typeof(XamlControls.MenuFlyoutPresenter));
-        presenterStyle.Setters.Add(new Xaml.Setter(XamlControls.Control.BackgroundProperty, card));
-        presenterStyle.Setters.Add(new Xaml.Setter(XamlControls.Control.BorderBrushProperty, separator));
-        presenterStyle.Setters.Add(new Xaml.Setter(XamlControls.Control.BorderThicknessProperty, new Xaml.Thickness(1)));
-        presenterStyle.Setters.Add(new Xaml.Setter(XamlControls.Control.CornerRadiusProperty, new Xaml.CornerRadius(10)));
-        presenterStyle.Setters.Add(new Xaml.Setter(XamlControls.Control.PaddingProperty, new Xaml.Thickness(4)));
-        presenterStyle.Setters.Add(new Xaml.Setter(Xaml.FrameworkElement.MinWidthProperty, 240d));
-        presenterStyle.Setters.Add(new Xaml.Setter(Xaml.FrameworkElement.RequestedThemeProperty, theme));
-        presenterStyle.Setters.Add(new Xaml.Setter(XamlControls.MenuFlyoutPresenter.IsDefaultShadowEnabledProperty, false));
-
-        var menu = new XamlControls.MenuFlyout
-        {
-            MenuFlyoutPresenterStyle = presenterStyle,
-            ShouldConstrainToRootBounds = false,
-        };
-        menu.Items.Add(Item(_text("TrayOpen"), "", Restore, dark, card, text));
-        menu.Items.Add(Separator(separator));
-        menu.Items.Add(Item(_text("TrayExit"), "", Exit, dark, card, text));
-        return menu;
+        var menu = new SocMenu(dark);
+        menu.Flyout.Items.Add(menu.Item(_text("TrayOpen"), "", Restore));
+        menu.Flyout.Items.Add(menu.Separator());
+        menu.Flyout.Items.Add(menu.Item(_text("TrayExit"), "", Exit));
+        return menu.Flyout;
     }
 
-    /// <summary>
-    /// Elemento del menu: 32 px de alto, esquinas de 6, icono plano de 14 px en indigo (en rojo
-    /// <c>Danger</c> si la accion es destructiva) y, bajo el raton, el fondo de seleccion.
-    /// </summary>
-    private static XamlControls.MenuFlyoutItem Item(string label, string glyph, Action action, bool dark,
-        XamlMedia.Brush card, XamlMedia.Brush text, bool enabled = true, bool danger = false)
-    {
-        var item = new XamlControls.MenuFlyoutItem
-        {
-            Text = label,
-            IsEnabled = enabled,
-            MinHeight = 32,
-            Padding = new Xaml.Thickness(8, 7, 10, 7),
-            CornerRadius = new Xaml.CornerRadius(6),
-            FontSize = 13,
-            Foreground = text,
-            Opacity = enabled ? 1 : 0.45,
-            Icon = new XamlControls.FontIcon
-            {
-                Glyph = glyph,
-                FontFamily = new XamlMedia.FontFamily(IconFont),
-                FontSize = 14,
-                Foreground = Brush(danger ? "Danger" : dark ? "PrimaryTextDark" : "PrimaryTextLight"),
-            },
-        };
-        // Colores de los estados del propio control (estilo ligero de WinUI): los del tema de la app.
-        var selection = Brush(dark ? "SelectionSurfaceDark" : "SelectionSurfaceLight");
-        item.Resources["MenuFlyoutItemBackground"] = new XamlMedia.SolidColorBrush(Microsoft.UI.Colors.Transparent);
-        item.Resources["MenuFlyoutItemBackgroundPointerOver"] = selection;
-        item.Resources["MenuFlyoutItemBackgroundPressed"] = selection;
-        item.Resources["MenuFlyoutItemBackgroundDisabled"] = card;
-        item.Resources["MenuFlyoutItemForeground"] = text;
-        item.Resources["MenuFlyoutItemForegroundPointerOver"] = text;
-        item.Resources["MenuFlyoutItemForegroundPressed"] = text;
-        item.Resources["MenuFlyoutItemForegroundDisabled"] = text;
-        // La accion, cuando el menu ya se ha cerrado (Salir cierra tambien la ventana auxiliar).
-        item.Click += (_, _) => Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().TryEnqueue(() => action());
-        return item;
-    }
-
-    /// <summary>Separador: 1 px del color de separador con margenes de 8·4.</summary>
-    private static XamlControls.MenuFlyoutSeparator Separator(XamlMedia.Brush color)
-    {
-        var separator = new XamlControls.MenuFlyoutSeparator { Padding = new Xaml.Thickness(8, 4, 8, 4) };
-        separator.Resources["MenuFlyoutSeparatorBackground"] = color;
-        separator.Resources["MenuFlyoutSeparatorThemeHeight"] = 1d;
-        return separator;
-    }
-
-    private static bool IsDark() => Application.Current?.RequestedTheme == AppTheme.Dark;
-
-    /// <summary>Un color de Resources/Styles/Colors.xaml como pincel de WinUI.</summary>
-    private static XamlMedia.SolidColorBrush Brush(string key)
-    {
-        var c = Application.Current?.Resources.TryGetValue(key, out var value) == true && value is Color color ? color : Colors.Gray;
-        return new XamlMedia.SolidColorBrush(global::Windows.UI.Color.FromArgb(
-            (byte)(c.Alpha * 255), (byte)(c.Red * 255), (byte)(c.Green * 255), (byte)(c.Blue * 255)));
-    }
+    private static bool IsDark() => SocMenu.IsDark;
 
     private void Add()
     {

@@ -2,6 +2,31 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.10.29.02 — Espacio en disco: botón derecho, ramas y filas planas
+
+`versionCode`: 2026102902 · Windows `2026.10.29.2` (MSIX `2026.10.2902.0`)
+
+- **Menú del botón derecho** (con el aspecto común de las apps sOC, General §6.14). En una carpeta
+  del árbol: **Actualizar esta rama** (vuelve a escanear solo esa carpeta y lo que cuelga de ella,
+  por la cola, y corrige los tamaños de las de encima), Ver en el Explorador, **Más opciones de
+  Windows…** (el menú completo del Explorador: VS Code, Notepad++, 7-Zip, Enviar a…), Copiar ruta
+  y **Borrar**. En un fichero (más grandes, duplicados): Abrir, **Abrir con ▸** (los programas que
+  Windows tiene asignados a ese tipo, con su icono, y «Elegir otra aplicación…»), Ver en el
+  Explorador, Más opciones de Windows…, Copiar ruta y Borrar.
+- **Al borrar solo se actualizan las ramas donde estaba lo borrado**: salen sus filas y se repintan
+  las carpetas de encima (y sus hijas a la vista, cuyo porcentaje cambia). El resto del árbol no se
+  toca: no se rehace la lista, no se pliega nada y no se pierde la posición. De los más grandes y
+  de los duplicados solo se quita lo borrado; borrar un duplicado ya no saca de esa vista.
+- **Al desplegar una rama, la lista se queda donde estaba** (volvía arriba).
+- **Las filas de las listas son rectángulos seguidos con una línea fina**, en vez de tarjetas
+  sueltas con las esquinas redondeadas (también la lista de programas, en Windows).
+- La cola enseña un icono fijo en la orden en marcha en lugar de la rueda animada de WinUI.
+
+### English
+- Right-click menu: refresh just that branch, show in Explorer, the full Windows context menu,
+  Open with (assigned apps), copy path and delete. Deleting only refreshes the affected branches;
+  expanding keeps the scroll position; flat list rows instead of rounded cards.
+
 ## 2026.10.29.01 — Windows: la versión correcta en «Acerca de»
 
 `versionCode`: 2026102901 · Windows `2026.10.29.1` (MSIX `2026.10.2901.0`)

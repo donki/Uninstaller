@@ -47,15 +47,18 @@
 
         <!-- Arbol de carpetas, aplanado: sangria por profundidad y desplegable por fila. La casilla
              marca varias para mandarlas a la papelera (o copiar sus rutas) de una vez. -->
-        <CollectionView Grid.Row="1" x:Name="TreeList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged">
+        <CollectionView Grid.Row="1" x:Name="TreeList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged" ItemsUpdatingScrollMode="KeepScrollOffset">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FolderNode">
-                    <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
+                    <Border Style="{StaticResource ListRow}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Buttons="Secondary" Tapped="OnRowSecondaryTapped" />
+                        </Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" Padding="4,6,10,6" Margin="{Binding Indent}">
                             <!-- Desplegable: zona de toque de 40 x 40 con el triangulo grande (antes era
                                  una letra de 18 px, dificil de acertar con el raton). -->
-                            <Border Grid.Column="0" WidthRequest="40" HeightRequest="40" Padding="0" StrokeThickness="1"
-                                    Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 10" BackgroundColor="Transparent"
+                            <Border Grid.Column="0" WidthRequest="40" HeightRequest="40" Padding="0" StrokeThickness="0"
+                                    StrokeShape="Rectangle" BackgroundColor="Transparent"
                                     Opacity="{Binding ExpanderOpacity}" VerticalOptions="Center">
                                 <Image Source="{Binding ExpanderIcon}" WidthRequest="26" HeightRequest="26"
                                        HorizontalOptions="Center" VerticalOptions="Center" />
@@ -96,10 +99,13 @@
         </Border>
 
         <!-- Ficheros mas grandes -->
-        <CollectionView Grid.Row="1" x:Name="LargestList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged" IsVisible="False">
+        <CollectionView Grid.Row="1" x:Name="LargestList" Margin="12,6,12,12" SelectionMode="Single" SelectionChanged="OnSelectionChanged" IsVisible="False" ItemsUpdatingScrollMode="KeepScrollOffset">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FileRow">
-                    <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
+                    <Border Style="{StaticResource ListRow}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Buttons="Secondary" Tapped="OnRowSecondaryTapped" />
+                        </Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" Padding="12,8">
                             <Image Grid.Column="0" Source="{Binding Icon}" WidthRequest="20" HeightRequest="20" VerticalOptions="Center" />
                             <VerticalStackLayout Grid.Column="1" Spacing="3">
@@ -120,7 +126,7 @@
         <CollectionView Grid.Row="1" x:Name="AggregateList" Margin="12,6,12,12" SelectionMode="None" IsVisible="False">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:AggregateRow">
-                    <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
+                    <Border Style="{StaticResource ListRow}">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,8">
                             <VerticalStackLayout Grid.Column="0" Spacing="3">
                                 <Label Text="{Binding Label}" Style="{StaticResource BodyText}" FontAttributes="Bold" />
@@ -138,7 +144,7 @@
         <CollectionView Grid.Row="1" x:Name="DuplicatesList" Margin="12,6,12,12" SelectionMode="None" IsVisible="False">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:DuplicateGroup">
-                    <Border Style="{StaticResource Card}" Margin="0,3" Padding="12,8">
+                    <Border Style="{StaticResource ListRow}" Padding="12,8">
                         <VerticalStackLayout Spacing="4">
                             <Label Text="{Binding Title}" Style="{StaticResource BodyText}" FontAttributes="Bold" LineBreakMode="MiddleTruncation" />
                             <Label Text="{Binding Detail}" Style="{StaticResource HintText}" />
@@ -148,6 +154,7 @@
                                         <Grid Padding="8,0,0,0" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6" BackgroundColor="{Binding RowColor}">
                                             <Grid.GestureRecognizers>
                                                 <TapGestureRecognizer Tapped="OnDuplicateRowTapped" />
+                                                <TapGestureRecognizer Buttons="Secondary" Tapped="OnRowSecondaryTapped" />
                                             </Grid.GestureRecognizers>
                                             <Image Grid.Column="0" Source="{Binding Icon}" WidthRequest="16" HeightRequest="16" VerticalOptions="Center" />
                                             <Label Grid.Column="1" Text="{Binding FullPath}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" VerticalOptions="Center" />
@@ -173,7 +180,9 @@
                         <DataTemplate x:DataType="services:QueuedJob">
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Padding="0,2">
                                 <Grid Grid.Column="0" WidthRequest="24" HeightRequest="24" VerticalOptions="Center">
-                                    <ActivityIndicator IsRunning="{Binding IsRunning}" IsVisible="{Binding IsRunning}" WidthRequest="20" HeightRequest="20" />
+                                    <!-- Icono fijo y no la rueda animada: las ordenes rapidas la creaban y destruian
+                                         en milisegundos, y el ProgressRing de WinUI no lo lleva bien. -->
+                                    <Image Source="ic_refresh.png" IsVisible="{Binding IsRunning}" WidthRequest="18" HeightRequest="18" />
                                     <Image Source="ic_clock.png" IsVisible="{Binding IsPending}" WidthRequest="18" HeightRequest="18" Opacity="0.6" />
                                     <Label Text="!" IsVisible="{Binding IsFailed}" TextColor="#D14343" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
                                 </Grid>

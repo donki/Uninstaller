@@ -21,6 +21,24 @@
     </Style>
 
     <!-- Tarjeta, base visual de la aplicacion. Border, nunca Frame (constitucion A.9). -->
+    <!-- Fila de una lista (arbol, ficheros, agregados, duplicados): rectangulo plano, seguido del
+         siguiente, con una linea fina de separador. Antes cada fila era una tarjeta suelta con las
+         esquinas redondeadas y, apiladas, quedaban como pastillas. -->
+    <Style x:Key="ListRow" TargetType="Border">
+        <Setter Property="BackgroundColor"
+                Value="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}" />
+        <Setter Property="Stroke"
+                Value="{AppThemeBinding Light={StaticResource SeparatorLight}, Dark={StaticResource SeparatorDark}}" />
+        <Setter Property="StrokeThickness" Value="0.5" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <Rectangle />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="BackgroundColor"
                 Value="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}" />

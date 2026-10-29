@@ -4,4 +4,13 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:maui="using:Microsoft.Maui">
+    <maui:MauiWinUIApplication.Resources>
+        <ResourceDictionary>
+            <!-- Las filas de las listas son rectangulos seguidos (estilo ListRow): el contenedor de
+                 cada elemento de la lista de WinUI les redondeaba las esquinas (4 px) y dejaba un
+                 hueco entre una y otra. -->
+            <CornerRadius x:Key="ListViewItemCornerRadius">0</CornerRadius>
+            <Thickness x:Key="ListViewItemRevealBorderThemeThickness">0</Thickness>
+        </ResourceDictionary>
+    </maui:MauiWinUIApplication.Resources>
 </maui:MauiWinUIApplication>

@@ -763,6 +763,118 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         Assert.Empty(_vm.Queue.Jobs);
     }
 
+    [Fact]
+    public async Task Borrar_solo_repinta_las_ramas_donde_estaba()
+    {
+        _tree.File(@"Docs\Viejo\vacio.txt", 0, DateTime.Now);   // otra rama, que no cambia
+        await ScanAsync();
+        _vm.Toggle(Node("Fotos"));   // Fotos desplegada: se ve Viejas
+        _vm.Toggle(Node("Docs"));
+        var rows = _vm.Rows.ToList();
+        Node(@"Docs\Viejo").SizeText = "sin tocar";   // no cuelga de nada de lo borrado: no se repinta
+        var percent = new List<string?>();
+        Node("Fotos").PropertyChanged += (_, e) => percent.Add(e.PropertyName);
+
+        Dialogs.Answer(L("DiskChoiceRecycle"));
+        _vm.TreeSelected = Node(@"Fotos\Viejas");
+        await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
+
+        // La fila borrada sale; las demas son las mismas filas, en su sitio, y Fotos sigue desplegada.
+        Assert.Equal(rows.Where(r => r.FullPath != P(@"Fotos\Viejas")), _vm.Rows);
+        Assert.True(Node("Fotos").IsExpanded);
+        Assert.Equal("sin tocar", Node(@"Docs\Viejo").SizeText);
+        Assert.Equal(_vm.FormatSize(140_000), Node("Fotos").SizeText);
+        Assert.Equal(_vm.FormatSize(141_510), _vm.Root!.SizeText);
+        Assert.Contains("Percent", percent);
+    }
+
+    [Fact]
+    public async Task Borrar_una_carpeta_desplegada_quita_tambien_sus_filas_de_debajo()
+    {
+        await ScanAsync();
+        _vm.Toggle(Node("Fotos"));
+        Assert.Contains(Node(@"Fotos\Viejas"), _vm.Rows);
+
+        Dialogs.Answer(L("DiskChoiceRecycle"));
+        _vm.TreeSelected = Node("Fotos");
+        await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
+
+        Assert.DoesNotContain(_vm.Rows, r => r.FullPath.StartsWith(P("Fotos")));
+        Assert.Equal(new[] { _vm.Root!, Node("Docs") }, _vm.Rows);
+    }
+
+    [Fact]
+    public async Task Borrar_un_duplicado_deja_la_vista_y_quita_el_grupo_que_ya_no_lo_es()
+    {
+        await ScanAsync();
+        await _vm.ChooseViewAsync(DiskViewMode.Duplicates);
+        var group = _vm.Duplicates!.Single();
+        _vm.SelectDuplicate(group.Rows[0]);
+
+        Dialogs.Answer(L("DiskChoiceRecycle"));
+        await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
+
+        Assert.Equal(DiskViewMode.Duplicates, _vm.Mode);
+        Assert.Empty(_vm.Duplicates!);   // quedaba una sola copia: ya no es duplicado
+    }
+
+    [Fact]
+    public async Task Actualizar_una_rama_rescanea_solo_esa_y_corrige_las_de_encima()
+    {
+        _tree.File(@"Fotos\Viejas\Sub\cero.txt", 0, DateTime.Now);   // para que Viejas se pueda desplegar
+        await ScanAsync();
+        _vm.Toggle(Node("Fotos"));
+        _vm.Toggle(Node(@"Fotos\Viejas"));
+        var docs = Node("Docs");
+        _tree.File(@"Fotos\Viejas\nueva.jpg", 5_000, DateTime.Now);   // aparece despues del escaneo
+        File.Delete(P(@"Fotos\b.jpg"));                                 // y desaparece otra
+
+        _vm.RefreshBranch(Node("Fotos"));
+        await _vm.Queue.WhenIdle();
+
+        Assert.Equal(145_000, Node("Fotos").Size);
+        Assert.Equal(146_510, _vm.Root!.Size);
+        Assert.Equal(7, _vm.Root.FileCount);
+        Assert.Contains(Node(@"Fotos\Viejas\Sub"), _vm.Rows);
+        Assert.Same(docs, Node("Docs"));                       // la otra rama ni se toca
+        Assert.True(Node(@"Fotos\Viejas").IsExpanded);          // lo desplegado sigue desplegado
+        Assert.Contains(Node(@"Fotos\Viejas"), _vm.Rows);
+        Assert.Equal(Node("Fotos").Depth + 1, Node(@"Fotos\Viejas").Depth);
+        Assert.Same(Node("Fotos"), Node(@"Fotos\Viejas").Parent);
+        Assert.Equal(string.Format(L("DiskRefreshed"), P("Fotos")), Toast.Shown[^1]);
+    }
+
+    [Fact]
+    public async Task Actualizar_una_rama_que_ya_no_existe_la_quita()
+    {
+        await ScanAsync();
+        Directory.Delete(P("Docs"), true);
+
+        _vm.RefreshBranch(Node("Docs"));
+        await _vm.Queue.WhenIdle();
+
+        Assert.Null(DiskUsageViewModel.FindNode(_vm.Root!, P("Docs")));
+        Assert.Equal(210_500, _vm.Root!.Size);
+        Assert.Empty(_vm.Queue.Jobs);
+    }
+
+    [Fact]
+    public async Task Borrar_desde_el_menu_una_ruta_concreta_y_la_raiz_nunca()
+    {
+        await ScanAsync();
+        await _vm.DeleteAsync([_vm.Root!.FullPath]);
+        Assert.Empty(Dialogs.Calls);
+
+        Dialogs.Answer(L("DiskChoiceRecycle"));
+        await _vm.DeleteAsync([P("suelto.bin")]);
+        await _vm.Queue.WhenIdle();
+        Assert.False(File.Exists(P("suelto.bin")));
+        Assert.Equal(211_010, _vm.Root.Size);
+    }
+
     // ---------- Exportar ----------
 
     [Fact]

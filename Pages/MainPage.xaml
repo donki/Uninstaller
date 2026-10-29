@@ -85,7 +85,7 @@
             <CollectionView x:Name="AppsList" SelectionMode="None" Margin="12,6,12,6">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="models:InstalledApp">
-                        <Border Style="{StaticResource Card}" Margin="0,4" Padding="0">
+                        <Border Style="{OnPlatform WinUI={StaticResource ListRow}, Default={StaticResource Card}}" Margin="{OnPlatform WinUI=0, Default='0,4'}" Padding="0">
                             <Grid ColumnDefinitions="Auto,*,Auto" Padding="12,10" ColumnSpacing="12">
                                 <Grid.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnRowTapped" />
