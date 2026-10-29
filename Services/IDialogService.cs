@@ -12,6 +12,12 @@ public interface IDialogService
     /// <summary>Menu de opciones. Devuelve la opcion elegida, el texto de cancelar o null.</summary>
     Task<string?> ActionSheetAsync(string? title, string cancel, params string[] options);
 
+    /// <summary>
+    /// Pregunta con mensaje y varias respuestas (p. ej. papelera, borrar definitivamente, cancelar).
+    /// Devuelve la opcion elegida o null si se cancela.
+    /// </summary>
+    Task<string?> ChoiceAsync(string title, string message, string cancel, params string[] options);
+
     /// <summary>Entrada de texto. Devuelve el texto o null si se cancela.</summary>
     Task<string?> PromptAsync(string title, string? message, string accept, string cancel, string? initialValue = null);
 }

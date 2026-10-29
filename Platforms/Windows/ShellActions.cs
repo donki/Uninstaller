@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
@@ -61,6 +61,13 @@ public class ShellActions : IShellActions
         return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
     }
 
+    /// <inheritdoc/>
+    public IReadOnlyList<string> DeleteForever(IReadOnlyList<string> paths, IProgress<DeleteProgress>? progress, CancellationToken token)
+    {
+        FileDeleter.Delete(paths.SelectMany(p => IsInRecycleBin(p) ? WithMetadata(p) : [p]).ToList(), progress, token);
+        return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+    }
+
     private static void Delete(IReadOnlyList<string> paths, bool allowUndo)
     {
         if (paths.Count == 0)
@@ -74,9 +81,11 @@ public class ShellActions : IShellActions
                     wFunc = 3,                              // FO_DELETE
                     // Varias rutas: separadas por un nulo y con doble nulo al final (una sola operacion).
                     pFrom = string.Join("\0", paths) + "\0\0",
-                    // FOF_NOCONFIRMATION | FOF_NOERRORUI (el progreso lo enseña Windows; los errores
-                    // los trata la pagina) y, salvo en la papelera, FOF_ALLOWUNDO.
-                    fFlags = (ushort)((allowUndo ? 0x0040 : 0) | 0x0010 | 0x0400),
+                    // FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI y, salvo en la papelera,
+                    // FOF_ALLOWUNDO. Sin ventanas de Windows: el progreso va en la cola de la pagina
+                    // y los errores los trata ella. Con la ventana de progreso de Windows (sin dueño,
+                    // a veces detras de la aplicacion) parecia que el aviso se quedaba colgado.
+                    fFlags = (ushort)((allowUndo ? 0x0040 : 0) | 0x0004 | 0x0010 | 0x0400),
                 };
                 SHFileOperation(ref op);
             }

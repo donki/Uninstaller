@@ -57,6 +57,10 @@ public class DiskUsageViewModel
     private readonly IDiskView _view;
     private CancellationTokenSource? _scan;
     private FileRow? _selectedDuplicate;
+    // Rutas ya mandadas a la cola (no se vuelven a encolar) y las borradas mientras se escaneaba,
+    // que se quitan del arbol al acabar: el escaneo lo esta rellenando desde otros hilos.
+    private readonly HashSet<string> _queued = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _removeAfterScan = [];
 
     public DiskUsageViewModel(ILocalizationService localization, IShellActions shell, IToastService toast,
         IDialogService dialogs, IDiskView view)
@@ -68,7 +72,12 @@ public class DiskUsageViewModel
         _view = view;
         Map.FormatSize = FormatSize;
         StatusText = _l["DiskHint"];
+        Queue = new OperationQueue(view.RunOnUi);
+        Queue.Changed += (_, _) => Notify();
     }
+
+    /// <summary>Ordenes en segundo plano (papelera, borrar, permisos, exportar): se sigue trabajando mientras.</summary>
+    public OperationQueue Queue { get; }
 
     public event EventHandler? Changed;
 
@@ -124,10 +133,6 @@ public class DiskUsageViewModel
     public bool ProgressVisible { get; private set; }
 
     public double Progress { get; private set; }
-
-    public bool BusyVisible { get; private set; }
-
-    public string BusyText { get; private set; } = string.Empty;
 
     public bool OpenEnabled { get; private set; }
 
@@ -218,7 +223,6 @@ public class DiskUsageViewModel
                 live ??= _view.StartTimer(TimeSpan.FromMilliseconds(600), RefreshLive);
             }));
             live?.Dispose();
-            Describe(Root);
             RebuildRows();
             StatusText = string.Format(_l.CurrentCulture, _l["DiskDone"], Root.FullPath, FormatSize(Root.Size), Root.FileCount, Root.FolderCount, (DateTime.Now - started).TotalSeconds.ToString("0.0", _l.CurrentCulture));
             ShowView(Mode == DiskViewMode.Duplicates ? DiskViewMode.Tree : Mode);
@@ -227,11 +231,7 @@ public class DiskUsageViewModel
         {
             // Lo escaneado hasta ahora se queda a la vista (con los acumulados que hubiera).
             live?.Dispose();
-            if (Root is not null)
-            {
-                Describe(Root);
-                RebuildRows();
-            }
+            RebuildRows();
             StatusText = _l["DiskCancelled"];
         }
         catch (Exception ex)
@@ -250,24 +250,22 @@ public class DiskUsageViewModel
             ScanEnabled = true;
             StopEnabled = false;
             ProgressVisible = false;
+            ApplyRemovedAfterScan();
             UpdateActions();
         }
     }
 
     public void Stop() => _scan?.Cancel();
 
-    /// <summary>Textos de la fila de una carpeta y de todas las que cuelgan.</summary>
-    private void Describe(FolderNode node)
+    /// <summary>
+    /// Textos de las filas a la vista. Solo de esas: cada carpeta pregunta al sistema su nombre e
+    /// icono, y hacerlo con todas las de un disco entero (cientos de miles) dejaba la aplicacion
+    /// congelada al acabar el escaneo. Las demas se describen al desplegarlas.
+    /// </summary>
+    private void DescribeRows()
     {
-        var stack = new Stack<FolderNode>();
-        stack.Push(node);
-        while (stack.Count > 0)
-        {
-            var n = stack.Pop();
+        foreach (var n in Rows)
             DescribeOne(n);
-            foreach (var c in n.Children)
-                stack.Push(c);
-        }
     }
 
     public void DescribeOne(FolderNode n)
@@ -332,6 +330,7 @@ public class DiskUsageViewModel
         ListRules.Flatten(Root, list);
         foreach (var n in list)
             Rows.Add(n);
+        DescribeRows();
     }
 
     /// <summary>Despliega o pliega una carpeta del arbol.</summary>
@@ -354,7 +353,10 @@ public class DiskUsageViewModel
             foreach (var c in node.Children)
                 ListRules.Flatten(c, list);
             for (var i = 0; i < list.Count; i++)
+            {
+                DescribeOne(list[i]);
                 Rows.Insert(index + 1 + i, list[i]);
+            }
         }
     }
 
@@ -458,6 +460,12 @@ public class DiskUsageViewModel
         {
             StatusText = _l["DiskCancelled"];
         }
+        catch (Exception ex)
+        {
+            // Antes solo se esperaba la cancelacion: cualquier otro fallo tiraba la aplicacion.
+            StatusText = _l["DiskHint"];
+            await _dialogs.AlertAsync(_l["Error"], ex.Message, _l["Ok"]);
+        }
         finally
         {
             _scan.Dispose();
@@ -465,6 +473,7 @@ public class DiskUsageViewModel
             ScanEnabled = true;
             StopEnabled = false;
             ProgressVisible = false;
+            ApplyRemovedAfterScan();
             Notify();
         }
     }
@@ -643,14 +652,14 @@ public class DiskUsageViewModel
 
     public async Task DeleteAsync()
     {
-        var paths = TargetPaths();
+        // Lo que ya esta en la cola no se vuelve a mandar.
+        var paths = TargetPaths().Where(p => !_queued.Contains(p)).ToList();
         if (paths.Count == 0)
             return;
         var culture = _l.CurrentCulture;
         // Lo que ya esta en la papelera no se puede mandar a la papelera: se borra definitivamente.
         var inBin = paths.Count(_shell.IsInRecycleBin);
         var allInBin = inBin == paths.Count;
-        var action = allInBin ? _l["DiskDeleteForever"] : _l["DiskDelete"];
         var message = DeleteMessage(paths, inBin);
         // Carpetas del sistema (Windows, Archivos de programa, el perfil…): se avisa del riesgo antes de nada.
         var risky = paths.Select(p => (Path: p, Key: _shell.SystemRisk(p))).Where(r => r.Key is not null).ToList();
@@ -663,63 +672,152 @@ public class DiskUsageViewModel
             if (await _dialogs.AlertAsync(_l["DiskRiskTitle"], string.Format(culture, _l["DiskRiskBody"], lines), _l["Cancel"], _l["DiskRiskContinue"]))
                 return;
         }
-        if (!await _dialogs.AlertAsync(action, message, action, _l["Cancel"]))
-            return;
+        bool forever;
+        if (allInBin)
+        {
+            if (!await _dialogs.AlertAsync(_l["DiskDeleteForever"], message, _l["DiskDeleteForever"], _l["Cancel"]))
+                return;
+            forever = true;
+        }
+        else
+        {
+            // Papelera (lo recomendado, va primero), borrar definitivamente o cancelar.
+            var choice = await _dialogs.ChoiceAsync(_l["DiskDelete"], message, _l["Cancel"], _l["DiskChoiceRecycle"], _l["DiskDeleteForever"]);
+            if (choice == _l["DiskChoiceRecycle"])
+                forever = false;
+            else if (choice == _l["DiskDeleteForever"])
+                forever = true;
+            else
+                return;
+        }
         // Carpetas en las que el escaneo ni pudo entrar: sin permisos seguro; se arreglan antes de intentarlo.
         var inaccessible = paths.Where(p => Root is not null && FindNode(Root, p) is { Inaccessible: true }).ToList();
-        if (inaccessible.Count > 0 && !await OfferPermissionsAsync(inaccessible))
+        if (inaccessible.Count > 0 && !await AskPermissionsAsync(inaccessible))
             return;
-        var failed = await RecycleAsync(paths, allInBin);
-        if (failed.Count > 0 && await OfferPermissionsAsync(failed))
-            failed = await RecycleAsync(failed, allInBin);
-        var done = paths.Where(p => !failed.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
-        foreach (var p in done)
-            RemoveFromModel(p, refresh: false);
-        if (done.Count > 0)
-            RefreshAfterRemove();
-        if (failed.Count > 0)
+        EnqueueRemove(paths, forever, fixFirst: inaccessible.Count > 0 ? inaccessible : null);
+        // Lo encolado se desmarca: la casilla ya no significa nada y asi no se vuelve a mandar.
+        foreach (var n in Rows.Where(n => n.IsChecked && _queued.Contains(n.FullPath)))
+            n.IsChecked = false;
+        foreach (var r in (Largest ?? []).Concat(Duplicates?.SelectMany(g => g.Rows) ?? []).Where(r => r.IsChecked && _queued.Contains(r.FullPath)))
+            r.IsChecked = false;
+        UpdateActions();
+    }
+
+    /// <summary>Titulo de la orden en la cola.</summary>
+    private string RemoveTitle(IReadOnlyList<string> paths, bool forever) => paths.Count == 1
+        ? string.Format(_l.CurrentCulture, _l[forever ? "DiskDeletingForever" : "DiskDeleting"], paths[0])
+        : string.Format(_l.CurrentCulture, _l[forever ? "DiskDeletingForeverMany" : "DiskDeletingMany"], paths.Count);
+
+    /// <summary>
+    /// Pone a la cola mandar esas rutas a la papelera (o borrarlas definitivamente). Con
+    /// <paramref name="fixFirst"/>, antes se arreglan los permisos de esas, y si aun asi falla algo ya
+    /// no se vuelve a ofrecer: se dice que fallo.
+    /// </summary>
+    private void EnqueueRemove(IReadOnlyList<string> paths, bool forever, IReadOnlyList<string>? fixFirst = null)
+    {
+        foreach (var p in paths)
+            _queued.Add(p);
+        // Cuantos ficheros son, segun el arbol: para la barra de progreso del borrado definitivo.
+        var totalFiles = Math.Max(1, paths.Sum(p => Root is not null && FindNode(Root, p) is { } node ? node.FileCount : 1));
+        IReadOnlyList<string> failed = paths;
+        var fixedOk = true;
+        Queue.Enqueue(RemoveTitle(paths, forever), async (job, token) =>
         {
+            if (fixFirst is not null)
+            {
+                job.Report(_l["DiskPermissionsWorking"], 0);
+                fixedOk = await _shell.FixPermissionsAsync(fixFirst);
+            }
+            failed = forever
+                ? _shell.DeleteForever(paths, new Callback<DeleteProgress>(p => job.Report(p.Current, p.Files / (double)totalFiles)), token)
+                : Recycle(paths, job, token);
+        }, async job =>
+        {
+            foreach (var p in paths)
+                _queued.Remove(p);
+            if (job.Error is not null)
+                failed = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+            var done = paths.Where(p => !failed.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
+            ApplyRemoved(done);
+            var culture = _l.CurrentCulture;
+            if (!fixedOk)
+                _toast.Show(_l["DiskPermissionsDenied"]);
+            if (done.Count > 0)
+                _toast.Show(done.Count > 1
+                    ? string.Format(culture, _l[forever ? "DiskDeletedForeverMany" : "DiskDeletedMany"], done.Count)
+                    : _l[forever ? "DiskDeletedForever" : "DiskDeleted"]);
+            if (failed.Count == 0 || job.CancelRequested || job.Error is not null)
+                return;
+            // Sin permiso: se ofrece arreglarlo y reintentar (una vez); si no, se dice que fallo.
+            if (fixFirst is null && await AskPermissionsAsync(failed))
+            {
+                EnqueueRemove(failed, forever, fixFirst: failed);
+                return;
+            }
             var detail = failed.Count == 1 && paths.Count == 1
                 ? string.Format(culture, _l["DiskDeleteFailed"], failed[0])
                 : string.Format(culture, _l["DiskDeleteFailedMany"], failed.Count, string.Join(Environment.NewLine, failed.Take(8)));
             await _dialogs.AlertAsync(_l["Error"], detail, _l["Ok"]);
-        }
-        if (done.Count > 0)
-            _toast.Show(done.Count > 1
-                ? string.Format(culture, _l[allInBin ? "DiskDeletedForeverMany" : "DiskDeletedMany"], done.Count)
-                : _l[allInBin ? "DiskDeletedForever" : "DiskDeleted"]);
-    }
-
-    /// <summary>A la papelera en segundo plano y con el aviso a la vista. Devuelve los que no se fueron.</summary>
-    private async Task<IReadOnlyList<string>> RecycleAsync(IReadOnlyList<string> paths, bool forever)
-    {
-        var culture = _l.CurrentCulture;
-        Busy(true, paths.Count == 1
-            ? string.Format(culture, _l[forever ? "DiskDeletingForever" : "DiskDeleting"], paths[0])
-            : string.Format(culture, _l[forever ? "DiskDeletingForeverMany" : "DiskDeletingMany"], paths.Count));
-        try { return await Task.Run(() => _shell.MoveToRecycleBin(paths)); }
-        finally { Busy(false, string.Empty); }
+        });
     }
 
     /// <summary>
-    /// No se pudo borrar (o ni entrar): se propone hacerse dueño de la carpeta y darse control total,
-    /// con permiso de administrador (UAC). True si se hizo.
+    /// A la papelera por tandas (unas 20), para que la cola enseñe por donde va y se pueda parar entre
+    /// una y otra. Devuelve las que siguen en el disco (las que fallaron y las que no se llegaron a mandar).
     /// </summary>
-    private async Task<bool> OfferPermissionsAsync(IReadOnlyList<string> paths)
+    private IReadOnlyList<string> Recycle(IReadOnlyList<string> paths, QueuedJob job, CancellationToken token)
+    {
+        var failed = new List<string>();
+        var size = Math.Max(1, (int)Math.Ceiling(paths.Count / 20.0));
+        for (var i = 0; i < paths.Count; i += size)
+        {
+            if (token.IsCancellationRequested)
+            {
+                failed.AddRange(paths.Skip(i));
+                break;
+            }
+            var part = paths.Skip(i).Take(size).ToList();
+            job.Report(part[0], i / (double)paths.Count);
+            failed.AddRange(_shell.MoveToRecycleBin(part));
+        }
+        return failed;
+    }
+
+    /// <summary>
+    /// No se pudo borrar (o ni entrar): ¿hacerse dueño de la carpeta y darse control total, con
+    /// permiso de administrador (UAC)? Solo pregunta; el cambio lo hace la orden de la cola.
+    /// </summary>
+    private Task<bool> AskPermissionsAsync(IReadOnlyList<string> paths)
     {
         var culture = _l.CurrentCulture;
         var shown = string.Join(Environment.NewLine, paths.Take(6));
         if (paths.Count > 6)
             shown += Environment.NewLine + string.Format(culture, _l["DiskAndMore"], paths.Count - 6);
-        if (!await _dialogs.AlertAsync(_l["DiskPermissionsTitle"], string.Format(culture, _l["DiskPermissionsBody"], shown), _l["DiskPermissionsFix"], _l["Cancel"]))
-            return false;
-        Busy(true, _l["DiskPermissionsWorking"]);
-        bool ok;
-        try { ok = await _shell.FixPermissionsAsync(paths); }
-        finally { Busy(false, string.Empty); }
-        if (!ok)
-            _toast.Show(_l["DiskPermissionsDenied"]);
-        return ok;
+        return _dialogs.AlertAsync(_l["DiskPermissionsTitle"], string.Format(culture, _l["DiskPermissionsBody"], shown), _l["DiskPermissionsFix"], _l["Cancel"]);
+    }
+
+    /// <summary>Lo borrado sale del arbol; si se esta escaneando, al acabar (el escaneo lo esta rellenando).</summary>
+    private void ApplyRemoved(IReadOnlyList<string> done)
+    {
+        if (done.Count == 0)
+            return;
+        if (_scan is not null)
+        {
+            _removeAfterScan.AddRange(done);
+            return;
+        }
+        foreach (var p in done)
+            RemoveFromModel(p, refresh: false);
+        RefreshAfterRemove();
+    }
+
+    private void ApplyRemovedAfterScan()
+    {
+        if (_removeAfterScan.Count == 0)
+            return;
+        var pending = _removeAfterScan.ToList();
+        _removeAfterScan.Clear();
+        ApplyRemoved(pending);
     }
 
     /// <summary>
@@ -745,13 +843,10 @@ public class DiskUsageViewModel
         return owner?.Files.FirstOrDefault(f => string.Equals(f.FullPath, path, StringComparison.OrdinalIgnoreCase))?.Size ?? 0;
     }
 
-    private void Busy(bool on, string text)
+    /// <summary>Progreso que avisa en el mismo hilo (la orden ya lo lleva a la interfaz).</summary>
+    private sealed class Callback<T>(Action<T> report) : IProgress<T>
     {
-        BusyText = text;
-        BusyVisible = on;
-        ScanEnabled = !on;
-        DeleteEnabled = !on && DeleteEnabled;
-        Notify();
+        public void Report(T value) => report(value);
     }
 
     /// <summary>Tras borrar: se quita del arbol y se restan los tamanos hacia arriba, sin volver a escanear.</summary>
@@ -762,7 +857,8 @@ public class DiskUsageViewModel
         var node = FindNode(Root, path);
         if (node is not null && node.Parent is not null)
         {
-            node.Parent.Children.Remove(node);
+            // Lista nueva en vez de quitarla en sitio: quien la este recorriendo sigue con la vieja.
+            node.Parent.Children = node.Parent.Children.Where(c => !ReferenceEquals(c, node)).ToList();
             for (var p = node.Parent; p is not null; p = p.Parent)
             {
                 p.Size -= node.Size;
@@ -792,7 +888,6 @@ public class DiskUsageViewModel
     {
         if (Root is null)
             return;
-        Describe(Root);
         RebuildRows();
         Largest = null;
         Duplicates = null;
@@ -863,26 +958,28 @@ public class DiskUsageViewModel
         return sb.ToString();
     }
 
-    /// <summary>Guarda el CSV en <paramref name="folder"/> y lo enseña en el Explorador.</summary>
-    public async Task ExportAsync(string folder, DateTime now)
+    /// <summary>Guarda el CSV en <paramref name="folder"/> (por la cola) y lo enseña en el Explorador.</summary>
+    public Task ExportAsync(string folder, DateTime now)
     {
         if (Root is null)
-            return;
+            return Task.CompletedTask;
         var csv = BuildCsv();
         var file = Path.Combine(folder, $"sOCUninstaller-espacio-{now:yyyyMMdd-HHmmss}.csv");
-        Busy(true, string.Format(_l.CurrentCulture, _l["DiskExporting"], file));
-        try
-        {
-            await File.WriteAllTextAsync(file, csv, new UTF8Encoding(true));
-            Busy(false, string.Empty);
-            _toast.Show(string.Format(_l.CurrentCulture, _l["DiskExported"], file));
-            _shell.RevealInExplorer(file);
-        }
-        catch (Exception ex)
-        {
-            Busy(false, string.Empty);
-            await _dialogs.AlertAsync(_l["Error"], ex.Message, _l["Ok"]);
-        }
+        Queue.Enqueue(string.Format(_l.CurrentCulture, _l["DiskExporting"], file),
+            (_, token) => File.WriteAllTextAsync(file, csv, new UTF8Encoding(true), token),
+            async job =>
+            {
+                if (job.Error is not null)
+                {
+                    await _dialogs.AlertAsync(_l["Error"], job.Error.Message, _l["Ok"]);
+                    return;
+                }
+                if (job.CancelRequested)
+                    return;
+                _toast.Show(string.Format(_l.CurrentCulture, _l["DiskExported"], file));
+                _shell.RevealInExplorer(file);
+            });
+        return Task.CompletedTask;
     }
 
     public static string Csv(string s) => s.Contains(';') || s.Contains('"') ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;

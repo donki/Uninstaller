@@ -2,6 +2,38 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.10.29.00 — Espacio en disco: borrar en segundo plano, sin cuelgues
+
+`versionCode`: 2026102900 · Windows `2026.10.29.0` (MSIX `2026.10.2900.0`)
+
+- **Borrar ya no bloquea la pantalla: las órdenes se encolan y se hacen en segundo plano.** Abajo
+  aparece la cola con cada orden (papelera, borrar definitivamente, cambiar permisos, exportar a
+  CSV), su progreso y un botón para pararla; mientras tanto se puede seguir escaneando, mirando
+  otras vistas y mandando más cosas a borrar. Las que fallan se quedan en la lista con el motivo.
+- **Al borrar se elige: enviar a la papelera, borrar definitivamente o cancelar.** El borrado
+  definitivo va fichero a fichero (con progreso y se puede parar) y no entra en las uniones ni en
+  los enlaces simbólicos: los quita sin tocar lo que hay al otro lado.
+- **Arreglado el spinner de «Enviando a la papelera» que no se iba nunca**: la ventana de progreso de
+  Windows (sin dueño, a veces detrás de la aplicación) ya no se usa; el progreso va en la cola. Y un
+  diálogo que se retiraba porque llegaba otro encima dejaba esperando para siempre a quien lo abrió.
+- **Arreglados los bloqueos y cierres del espacio en disco**: al acabar un escaneo grande se pedía al
+  sistema el nombre y el icono de *todas* las carpetas (cientos de miles) en el hilo de la
+  interfaz; ahora solo las que se ven, y el resto al desplegarlas. Borrar mientras se escaneaba
+  modificaba el árbol que el escaneo estaba rellenando desde otros hilos; ahora se aplica al
+  acabar. Un error al buscar duplicados (o en cualquier botón) cerraba la aplicación; ahora se
+  explica.
+- **Los botones para desplegar el árbol son más grandes**: zona de 40 × 40 con una flecha, y se
+  marcan al pasar el ratón.
+- **Al maximizar o salir de pantalla completa, el árbol y las listas ocupan el ancho nuevo** (el
+  CollectionView de WinUI a veces se quedaba con el de antes).
+
+### English
+- Deleting no longer blocks the screen: orders are queued and run in the background, with progress
+  and a stop button, while you keep working. When deleting you choose Recycle Bin, delete
+  permanently or cancel. Fixed the never-ending “Moving to the Recycle Bin” spinner, freezes after
+  scanning large drives and crashes when deleting during a scan. Bigger tree expand buttons; lists
+  resize correctly when the window is maximized.
+
 ## 2026.10.16.00 — El menú de la bandeja, como en el resto de apps sOC
 
 `versionCode`: 2026101600 · Windows `2026.10.16.0` (MSIX `2026.10.1600.0`)

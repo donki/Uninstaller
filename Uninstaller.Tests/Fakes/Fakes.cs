@@ -107,6 +107,7 @@ public sealed class FakeShell : IShellActions
     public bool FixWorks { get; set; } = true;
     public List<IReadOnlyList<string>> Fixed { get; } = new();
     public List<string> Recycled { get; } = new();
+    public List<string> DeletedForever { get; } = new();
 
     public IReadOnlyList<DriveEntry> GetDrives() => Drives;
     public void RevealInExplorer(string path) { if (RevealError is { } e) throw e; Revealed.Add(path); }
@@ -121,6 +122,13 @@ public sealed class FakeShell : IShellActions
             Recycled.Add(p);
         }
         return failed;
+    }
+    public IReadOnlyList<string> DeleteForever(IReadOnlyList<string> paths, IProgress<DeleteProgress>? progress, CancellationToken token)
+    {
+        var failed = paths.Where(Locked.Contains).ToList();
+        FileDeleter.Delete(paths.Except(failed).ToList(), progress, token);
+        DeletedForever.AddRange(paths.Except(failed));
+        return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
     }
     public Task<bool> FixPermissionsAsync(IReadOnlyList<string> paths)
     {
@@ -175,6 +183,13 @@ public sealed class ScriptedDialogs : IDialogService
     {
         Calls.Add(("sheet", title, null, options));
         return Task.FromResult(_answers.Count > 0 ? (string?)_answers.Dequeue() : cancel);
+    }
+
+    /// <summary>Sin respuesta preparada elige la primera opcion (la recomendada).</summary>
+    public Task<string?> ChoiceAsync(string title, string message, string cancel, params string[] options)
+    {
+        Calls.Add(("choice", title, message, options));
+        return Task.FromResult(_answers.Count > 0 ? (string?)_answers.Dequeue() : options[0]);
     }
 
     public Task<string?> PromptAsync(string title, string? message, string accept, string cancel, string? initialValue = null)

@@ -2,9 +2,10 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:models="clr-namespace:Uninstaller.Models"
+             xmlns:services="clr-namespace:Uninstaller.Services"
              x:Class="Uninstaller.Pages.DiskUsagePage">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- Cabecera: que escanear, estado del escaneo, vistas y acciones. Solo iconos, como el
              resto de la aplicacion (constitucion). -->
@@ -50,12 +51,19 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:FolderNode">
                     <Border Style="{StaticResource Card}" Margin="0,2" Padding="0">
-                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" Padding="10,8" Margin="{Binding Indent}">
-                            <Label Grid.Column="0" Text="{Binding Expander}" Style="{StaticResource BodyText}" WidthRequest="18" VerticalOptions="Center" HorizontalTextAlignment="Center">
-                                <Label.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" Padding="4,6,10,6" Margin="{Binding Indent}">
+                            <!-- Desplegable: zona de toque de 40 x 40 con el triangulo grande (antes era
+                                 una letra de 18 px, dificil de acertar con el raton). -->
+                            <Border Grid.Column="0" WidthRequest="40" HeightRequest="40" Padding="0" StrokeThickness="1"
+                                    Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 10" BackgroundColor="Transparent"
+                                    Opacity="{Binding ExpanderOpacity}" VerticalOptions="Center">
+                                <Image Source="{Binding ExpanderIcon}" WidthRequest="26" HeightRequest="26"
+                                       HorizontalOptions="Center" VerticalOptions="Center" />
+                                <Border.GestureRecognizers>
                                     <TapGestureRecognizer Tapped="OnExpanderTapped" />
-                                </Label.GestureRecognizers>
-                            </Label>
+                                    <PointerGestureRecognizer PointerEntered="OnExpanderPointerEntered" PointerExited="OnExpanderPointerExited" />
+                                </Border.GestureRecognizers>
+                            </Border>
                             <!-- Icono del sistema (el de carpeta, o el propio de la unidad en la raiz). -->
                             <Image Grid.Column="1" Source="{Binding Icon}" WidthRequest="20" HeightRequest="20" VerticalOptions="Center" />
                             <VerticalStackLayout Grid.Column="2" Spacing="3">
@@ -73,15 +81,6 @@
                 <Label x:Name="EmptyLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" Padding="30" />
             </CollectionView.EmptyView>
         </CollectionView>
-
-        <!-- Operacion en curso (papelera, exportar): la pantalla no se queda muda. -->
-        <Grid Grid.Row="1" x:Name="BusyOverlay" IsVisible="False" InputTransparent="False"
-              BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}" Opacity="0.92" ZIndex="10">
-            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12" Padding="32,0">
-                <ActivityIndicator IsRunning="True" WidthRequest="42" HeightRequest="42" />
-                <Label x:Name="BusyLabel" Style="{StaticResource HintText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" LineBreakMode="MiddleTruncation" />
-            </VerticalStackLayout>
-        </Grid>
 
         <!-- Mapa de rectangulos (treemap): un toque elige la carpeta, dos entran en ella; la flecha sube. -->
         <Border Grid.Row="1" x:Name="MapPanel" Style="{StaticResource Card}" Margin="12,6,12,12" Padding="4" IsVisible="False">
@@ -163,6 +162,36 @@
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
+
+        <!-- Cola de ordenes en segundo plano (papelera, borrar, permisos, exportar): se puede seguir
+             trabajando mientras. Cada una con su progreso y para pararla; las que fallan se quedan
+             con el motivo hasta quitarlas. -->
+        <Border Grid.Row="2" x:Name="QueuePanel" Style="{StaticResource Card}" Margin="12,0,12,12" Padding="10,6" IsVisible="False">
+            <ScrollView MaximumHeightRequest="190">
+                <VerticalStackLayout x:Name="QueueList" Spacing="4">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="services:QueuedJob">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Padding="0,2">
+                                <Grid Grid.Column="0" WidthRequest="24" HeightRequest="24" VerticalOptions="Center">
+                                    <ActivityIndicator IsRunning="{Binding IsRunning}" IsVisible="{Binding IsRunning}" WidthRequest="20" HeightRequest="20" />
+                                    <Image Source="ic_clock.png" IsVisible="{Binding IsPending}" WidthRequest="18" HeightRequest="18" Opacity="0.6" />
+                                    <Label Text="!" IsVisible="{Binding IsFailed}" TextColor="#D14343" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
+                                </Grid>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Title}" Style="{StaticResource BodyText}" LineBreakMode="MiddleTruncation" />
+                                    <ProgressBar Progress="{Binding Progress}" IsVisible="{Binding IsRunning}" ProgressColor="{StaticResource Primary}" HeightRequest="4" />
+                                    <Label Text="{Binding Detail}" Style="{StaticResource HintText}" LineBreakMode="MiddleTruncation" />
+                                </VerticalStackLayout>
+                                <Grid Grid.Column="2" VerticalOptions="Center">
+                                    <Button Style="{StaticResource IconButton}" ImageSource="ic_stop.png" IsVisible="{Binding CanCancel}" Clicked="OnJobCancelClicked" />
+                                    <Button Style="{StaticResource IconButton}" ImageSource="ic_clear_selection.png" IsVisible="{Binding IsFailed}" Clicked="OnJobDismissClicked" />
+                                </Grid>
+                            </Grid>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
 
     </Grid>
 

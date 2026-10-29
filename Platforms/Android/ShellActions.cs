@@ -22,6 +22,12 @@ public class ShellActions : IShellActions
 
     public IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths) => paths.Where(p => !MoveToRecycleBin(p)).ToList();
 
+    public IReadOnlyList<string> DeleteForever(IReadOnlyList<string> paths, IProgress<DeleteProgress>? progress, CancellationToken token)
+    {
+        FileDeleter.Delete(paths, progress, token);
+        return paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+    }
+
     public Task<bool> FixPermissionsAsync(IReadOnlyList<string> paths) => Task.FromResult(false);
 
     public string? SystemRisk(string path) => null;

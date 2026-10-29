@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Uninstaller.Models;
 using Uninstaller.Services;
 using Uninstaller.Tests.Fakes;
@@ -440,16 +440,19 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         await ScanAsync();
         _vm.TreeSelected = Node("Docs");
 
-        Dialogs.Answer(true);
+        Dialogs.Answer(L("DiskChoiceRecycle"));
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
+        Assert.Equal("choice", Dialogs.Last.Kind);
+        Assert.Equal(new[] { L("DiskChoiceRecycle"), L("DiskDeleteForever") }, Dialogs.Last.Options);
         Assert.Equal(string.Format(L("DiskDeleteFolderConfirm"), P("Docs")), Dialogs.Last.Message);
         Assert.False(Directory.Exists(P("Docs")));
         Assert.Equal(210500, _vm.Root!.Size);
         Assert.Equal(4, _vm.Root.FileCount);
         Assert.Equal(2, _vm.Rows.Count);
         Assert.Equal(new[] { L("DiskDeleted") }, Toast.Shown);
-        Assert.False(_vm.BusyVisible);
+        Assert.Empty(_vm.Queue.Jobs);
     }
 
     [Fact]
@@ -458,11 +461,13 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         await ScanAsync();
         _vm.TreeSelected = Node("Docs");
 
-        Dialogs.Answer(false);
+        Dialogs.Answer(L("Cancel"));
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.True(Directory.Exists(P("Docs")));
         Assert.Empty(Toast.Shown);
+        Assert.Empty(_vm.Queue.Jobs);
     }
 
     [Fact]
@@ -470,6 +475,7 @@ public sealed class DiskUsageViewModelTests : ConIdioma
     {
         await ScanAsync();
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
         Assert.Empty(Dialogs.Calls);
     }
 
@@ -482,13 +488,15 @@ public sealed class DiskUsageViewModelTests : ConIdioma
 
         Dialogs.Answer(true);   // «Cancelar» es el boton principal
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Equal(L("DiskRiskTitle"), Dialogs.Last.Title);
         Assert.Equal(L("Cancel"), Dialogs.Last.Options[0]);
         Assert.True(Directory.Exists(P("Docs")));
 
-        Dialogs.Answer(false, true);
+        Dialogs.Answer(false, L("DiskChoiceRecycle"));
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
         Assert.False(Directory.Exists(P("Docs")));
     }
 
@@ -508,6 +516,8 @@ public sealed class DiskUsageViewModelTests : ConIdioma
 
         await _vm.DeleteAsync();   // sin respuesta: el doble acepta, que aqui es «Cancelar»
 
+        await _vm.Queue.WhenIdle();
+
         Assert.Contains(string.Format(L("DiskAndMore"), 1), Dialogs.Last.Message);
     }
 
@@ -519,8 +529,9 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         foreach (var row in _vm.Largest!.Where(r => r.Name.EndsWith(".jpg")))
             row.IsChecked = true;
 
-        Dialogs.Answer(true);
+        Dialogs.Answer(L("DiskChoiceRecycle"));
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Contains(_vm.FormatSize(210000), Dialogs.Last.Message);
         Assert.Equal(1510, _vm.Root!.Size);
@@ -556,6 +567,7 @@ public sealed class DiskUsageViewModelTests : ConIdioma
 
         Dialogs.Answer(true);
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Equal(L("DiskDeleteForever"), Dialogs.Last.Title);
         Assert.Equal(string.Format(L("DiskDeleteForeverFileConfirm"), P("suelto.bin")), Dialogs.Last.Message);
@@ -569,8 +581,9 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         _shell.Locked.Add(P("Docs"));
         _vm.TreeSelected = Node("Docs");
 
-        Dialogs.Answer(true, true);
+        Dialogs.Answer(L("DiskChoiceRecycle"), true);
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Equal(L("DiskPermissionsTitle"), Dialogs.Last.Title);
         Assert.Single(_shell.Fixed);
@@ -586,8 +599,9 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         _shell.FixWorks = false;
         _vm.TreeSelected = Node("Docs");
 
-        Dialogs.Answer(true, true);
+        Dialogs.Answer(L("DiskChoiceRecycle"), true);
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Equal(new[] { L("DiskPermissionsDenied") }, Toast.Shown);
         Assert.Equal(string.Format(L("DiskDeleteFailed"), P("Docs")), Dialogs.Last.Message);
@@ -602,8 +616,9 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         Node("Docs").IsChecked = true;
         Node("Fotos").IsChecked = true;
 
-        Dialogs.Answer(true, false);   // confirma; no quiere arreglar permisos
+        Dialogs.Answer(L("DiskChoiceRecycle"), false);   // a la papelera; no quiere arreglar permisos
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Equal(string.Format(L("DiskDeleteFailedMany"), 1, P("Docs")), Dialogs.Last.Message);
         Assert.Equal(new[] { L("DiskDeleted") }, Toast.Shown);
@@ -616,8 +631,9 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         Node("Docs").Inaccessible = true;
         _vm.TreeSelected = Node("Docs");
 
-        Dialogs.Answer(true, false);
+        Dialogs.Answer(L("DiskChoiceRecycle"), false);
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.True(Directory.Exists(P("Docs")));
         Assert.Empty(_shell.Recycled);
@@ -663,11 +679,88 @@ public sealed class DiskUsageViewModelTests : ConIdioma
         _vm.MapDoubleTapped(new PointF(tile.Bounds.Center.X, tile.Bounds.Center.Y));
         Assert.True(_vm.DeleteEnabled);
 
-        Dialogs.Answer(true);
+        Dialogs.Answer(L("DiskChoiceRecycle"));
         await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
 
         Assert.Same(_vm.Root, _vm.MapRoot);
         Assert.False(Directory.Exists(P("Fotos")));
+    }
+
+    [Fact]
+    public async Task Borrar_definitivamente_no_pasa_por_la_papelera()
+    {
+        await ScanAsync();
+        _vm.TreeSelected = Node("Fotos");
+
+        Dialogs.Answer(L("DiskDeleteForever"));
+        await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
+
+        Assert.False(Directory.Exists(P("Fotos")));
+        Assert.Empty(_shell.Recycled);
+        Assert.Equal(new[] { P("Fotos") }, _shell.DeletedForever);
+        Assert.Equal(new[] { L("DiskDeletedForever") }, Toast.Shown);
+        Assert.Equal(1510, _vm.Root!.Size);
+    }
+
+    [Fact]
+    public async Task Lo_encolado_se_desmarca_y_no_se_vuelve_a_mandar()
+    {
+        await ScanAsync();
+        Node("Docs").IsChecked = true;
+        _shell.Locked.Add(P("Docs"));   // falla, y sin arreglar permisos se queda
+
+        Dialogs.Answer(L("DiskChoiceRecycle"), false);
+        await _vm.DeleteAsync();
+        Assert.False(Node("Docs").IsChecked);
+        await _vm.Queue.WhenIdle();
+
+        Assert.Empty(_vm.Queue.Jobs);
+        Assert.True(Directory.Exists(P("Docs")));
+    }
+
+    [Fact]
+    public async Task Lo_borrado_mientras_se_escanea_sale_del_arbol_al_acabar()
+    {
+        await ScanAsync();
+        _vm.TreeSelected = Node("Docs");
+        // Un escaneo nuevo en marcha mientras la orden acaba: el arbol no se toca hasta el final.
+        Dialogs.Answer(L("DiskChoiceRecycle"));
+        await _vm.DeleteAsync();
+        await _vm.Queue.WhenIdle();
+        Assert.False(Directory.Exists(P("Docs")));
+
+        await ScanAsync();
+        Assert.Null(DiskUsageViewModel.FindNode(_vm.Root!, P("Docs")));
+        Assert.Equal(210500, _vm.Root!.Size);
+    }
+
+    [Fact]
+    public async Task Al_escanear_solo_se_describen_las_filas_a_la_vista()
+    {
+        await ScanAsync();
+        var hidden = Node(@"Fotos\Viejas");
+        Assert.DoesNotContain(hidden, _vm.Rows);
+        Assert.Equal(string.Empty, hidden.SizeText);
+
+        _vm.Toggle(Node("Fotos"));
+
+        Assert.Contains(hidden, _vm.Rows);
+        Assert.Equal(_vm.FormatSize(70_000), hidden.SizeText);
+    }
+
+    [Fact]
+    public async Task Exportar_que_falla_queda_explicado_y_la_cola_vacia()
+    {
+        await ScanAsync();
+        await _vm.ExportAsync(P(@"no\existe"), DateTime.Now);
+        await _vm.Queue.WhenIdle();
+        Assert.Equal(L("Error"), Dialogs.Last.Title);
+        Assert.Single(_vm.Queue.Jobs);
+        Assert.True(_vm.Queue.Jobs[0].IsFailed);
+        _vm.Queue.Dismiss(_vm.Queue.Jobs[0]);
+        Assert.Empty(_vm.Queue.Jobs);
     }
 
     // ---------- Exportar ----------
@@ -707,23 +800,27 @@ public sealed class DiskUsageViewModelTests : ConIdioma
 
         await _vm.ExportAsync(outDir.Root, new DateTime(2026, 10, 1, 12, 30, 5));
 
+        await _vm.Queue.WhenIdle();
+
         var file = Path.Combine(outDir.Root, "sOCUninstaller-espacio-20261001-123005.csv");
         Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, File.ReadAllBytes(file)[..3]);
         Assert.Equal(new[] { file }, _shell.Revealed);
         Assert.Equal(string.Format(L("DiskExported"), file), Toast.Shown[^1]);
-        Assert.False(_vm.BusyVisible);
+        Assert.Empty(_vm.Queue.Jobs);
     }
 
     [Fact]
     public async Task Exportar_sin_escaneo_no_hace_nada_y_un_error_se_explica()
     {
         await _vm.ExportAsync(_tree.Root, DateTime.Now);
+        await _vm.Queue.WhenIdle();
         Assert.Empty(_shell.Revealed);
 
         await ScanAsync();
         await _vm.ExportAsync(P("no-existe"), DateTime.Now);
+        await _vm.Queue.WhenIdle();
         Assert.Equal(L("Error"), Dialogs.Last.Title);
-        Assert.False(_vm.BusyVisible);
+        Assert.True(_vm.Queue.Jobs.Single().IsFailed);
     }
 
     [Fact]

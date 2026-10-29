@@ -70,7 +70,13 @@ public sealed class FolderNode : INotifyPropertyChanged
     }
 
     /// <summary>Durante el escaneo las subcarpetas llegan despues de crear la fila: el desplegable se entera aqui.</summary>
-    public void NotifyChildrenChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Expander)));
+    public void NotifyChildrenChanged()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Expander)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpanderIcon)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasChildren)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpanderOpacity)));
+    }
 
     /// <summary>Parte del padre que ocupa esta carpeta (0..1); en la raiz, 1.</summary>
     public double Percent => Parent is null || Parent.Size <= 0 ? 1 : Math.Min(1, Size / (double)Parent.Size);
@@ -88,11 +94,18 @@ public sealed class FolderNode : INotifyPropertyChanged
             _isExpanded = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Expander)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpanderIcon)));
         }
     }
 
     /// <summary>Glifo del desplegable: vacio si no hay subcarpetas.</summary>
     public string Expander => !HasChildren ? string.Empty : IsExpanded ? "▾" : "▸";
+
+    /// <summary>Icono del boton de desplegar (flecha a la derecha o abajo); null si no hay subcarpetas.</summary>
+    /// <summary>Sin subcarpetas el boton no se ve, pero guarda su sitio para que las filas sigan alineadas.</summary>
+    public double ExpanderOpacity => HasChildren ? 1 : 0;
+
+    public string? ExpanderIcon => !HasChildren ? null : IsExpanded ? "ic_chevron_down.png" : "ic_chevron_right.png";
 
     private bool _isChecked;
     /// <summary>Marcada con su casilla para actuar sobre varias a la vez (papelera, copiar rutas).</summary>

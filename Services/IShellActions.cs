@@ -24,6 +24,12 @@ public interface IShellActions
     IReadOnlyList<string> MoveToRecycleBin(IReadOnlyList<string> paths);
 
     /// <summary>
+    /// Borra definitivamente, sin papelera, fichero a fichero (se puede parar a medias). Lo que ya
+    /// estaba en la papelera se lleva tambien su ficha. Devuelve las rutas que siguen existiendo.
+    /// </summary>
+    IReadOnlyList<string> DeleteForever(IReadOnlyList<string> paths, IProgress<DeleteProgress>? progress, CancellationToken token);
+
+    /// <summary>
     /// Hace al usuario dueño de esas rutas y le da control total sobre ellas y todo su contenido
     /// (Windows pide permiso de administrador). False si el usuario no lo concede o falla.
     /// </summary>
