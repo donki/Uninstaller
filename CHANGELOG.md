@@ -2,6 +2,19 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## 2026.10.29.01 — Windows: la versión correcta en «Acerca de»
+
+`versionCode`: 2026102901 · Windows `2026.10.29.1` (MSIX `2026.10.2901.0`)
+
+- **En Windows, «Acerca de» y el menú enseñan la versión de verdad** (2026.10.29.01). Leían la
+  versión del ejecutable, que estaba fija a mano en el csproj (2026.9.30.0) y no se subía con cada
+  versión. Ahora `AssemblyVersion`, `FileVersion` e `InformationalVersion` salen de
+  `ApplicationDisplayVersion`, y la aplicación enseña ese mismo texto también desde el MSIX (que
+  si no daría 2026.10.2901.0).
+
+### English
+- On Windows, About and the menu show the real version; it was stuck at 2026.9.30.0.
+
 ## 2026.10.29.00 — Espacio en disco: borrar en segundo plano, sin cuelgues
 
 `versionCode`: 2026102900 · Windows `2026.10.29.0` (MSIX `2026.10.2900.0`)

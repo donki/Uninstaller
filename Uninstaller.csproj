@@ -21,8 +21,8 @@
     <ApplicationId>com.socratic.uninstaller</ApplicationId>
 
     <!-- Versions (constitucion 11 / A.4: ambos valores en sincronia) -->
-    <ApplicationDisplayVersion>2026.10.29.00</ApplicationDisplayVersion>
-    <ApplicationVersion>2026102900</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.10.29.01</ApplicationDisplayVersion>
+    <ApplicationVersion>2026102901</ApplicationVersion>
 
     <!-- Accept Android SDK Licenses -->
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
@@ -51,8 +51,13 @@
     <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
     <UseInterpreter>false</UseInterpreter>
 
-    <AssemblyVersion>2026.9.30.0</AssemblyVersion>
-    <FileVersion>2026.9.30.0</FileVersion>
+    <!-- Salen de ApplicationDisplayVersion (2026.10.29.01 -> 2026.10.29.1): fijas a mano se quedaban
+         atrasadas y en Windows sin empaquetar «Acerca de» enseñaba la version vieja. El texto tal
+         cual va en InformationalVersion, que es lo que enseña la aplicacion en Windows. -->
+    <AssemblyVersion>$([System.Version]::Parse('$(ApplicationDisplayVersion)').ToString())</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <InformationalVersion>$(ApplicationDisplayVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <!-- Windows: sin empaquetar durante el desarrollo (el exe arranca directamente); el MSIX para la

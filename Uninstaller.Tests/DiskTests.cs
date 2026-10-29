@@ -245,6 +245,10 @@ public class FolderNodeTests
         root.IsExpanded = true;
         root.IsExpanded = true;
         Assert.Equal("▾", root.Expander);
+        Assert.Equal("ic_chevron_down.png", root.ExpanderIcon);
+        Assert.Equal(1, root.ExpanderOpacity);
+        Assert.Null(grandchild.ExpanderIcon);
+        Assert.Equal(0, grandchild.ExpanderOpacity);
         Assert.Equal(string.Empty, grandchild.Expander);
         root.NotifyChildrenChanged();
         root.IsChecked = true;
@@ -258,7 +262,8 @@ public class FolderNodeTests
         root.Icon = icon;
 
         Assert.Equal(
-            ["IsExpanded", "Expander", "Expander", "IsChecked", "Display", "SizeText", "DetailText", "Icon"],
+            ["IsExpanded", "Expander", "ExpanderIcon", "Expander", "ExpanderIcon", "HasChildren", "ExpanderOpacity",
+             "IsChecked", "Display", "SizeText", "DetailText", "Icon"],
             changes);
         Assert.True(root.IsChecked);
         Assert.Equal("Disco local", root.Display);

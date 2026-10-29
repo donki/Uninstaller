@@ -83,7 +83,7 @@ public partial class AppShell : Shell
         SettingsLabel.Text = _l["SettingsTitle"];
         SettingsItem.IsVisible = true;
         AboutLabel.Text = _l["About"];
-        VersionLabel.Text = $"v{AppInfo.Current.VersionString}";
+        VersionLabel.Text = $"v{Services.MauiAppEnvironment.DisplayVersion}";
 
         // Los titulos de las rutas del Shell tambien se localizan (constitucion 8).
         foreach (var item in Items)
