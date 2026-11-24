@@ -28,7 +28,7 @@ public partial class MainPage : ContentPage, IMainView
             ServiceHelper.GetRequiredService<IToastService>(),
             _dialogs, this,
             ServiceHelper.GetRequiredService<ILogger<MainPage>>(),
-            isWindows: DeviceInfo.Platform == DevicePlatform.WinUI);
+            isWindows: OperatingSystem.IsWindows());
 #if WINDOWS
         // Espacio en disco: solo en Windows (en Android haria falta el permiso de todo el almacenamiento).
         HeaderButtons.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));

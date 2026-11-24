@@ -28,7 +28,7 @@ public partial class SettingsPage : ContentPage
         LanguageTitle.Text = _vm.LanguageTitle;
         SpanishButton.Style = (Style)Application.Current!.Resources[_vm.IsSpanish ? "PrimaryButton" : "OutlineButton"];
         EnglishButton.Style = (Style)Application.Current.Resources[_vm.IsSpanish ? "OutlineButton" : "PrimaryButton"];
-        WindowsCard.IsVisible = DeviceInfo.Platform == DevicePlatform.WinUI;
+        WindowsCard.IsVisible = OperatingSystem.IsWindows();
         TraySwitch.IsToggled = _vm.TrayOnMinimize;
         StartupSwitch.IsToggled = _vm.StartsWithWindows;
         _vm.Loading = false;

@@ -1,4 +1,4 @@
-﻿# Uninstaller
+# Uninstaller
 
 Desinstalador masivo de aplicaciones para **Android y Windows**, en .NET MAUI (el mismo proyecto
 para los dos). Lista las apps instaladas, permite seleccionar varias con checkbox y desinstalarlas
@@ -54,20 +54,23 @@ en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
 
 ## Pruebas
 
-**267 pruebas** (xUnit), todas pasan · cobertura del código probado **98,2 %** de líneas · sobre
-toda la app **50,8 %** (2 123 de 4 180 líneas) · el banco tarda **~0,9 s** (≈ 6 s con el arranque de
-`dotnet test` y la cobertura). Medido el 2026-10-01 (el 2026-09-30: 168 pruebas, 28,0 % con la medida
-antigua, que dejaba fuera los métodos `async`; 28,5 % con la corregida).
+**330 pruebas** (xUnit), todas pasan · cobertura del código probado **87,4 %** de líneas · sobre
+toda la app **54,9 %** (2 918 de 5 312 líneas) · el banco tarda **~5 s** (≈ 10 s con el arranque de
+`dotnet test` y la cobertura). Medido el 2026-11-24 (el 2026-10-01: 267 pruebas, 50,8 % de 4 180
+líneas; antes de esta tanda, con el código de octubre, 47,5 % de 5 307).
 
 Se prueba la lógica de las cuatro pantallas (`ViewModels/`: lista de aplicaciones, espacio en disco,
 Ajustes, Acerca de) con dobles del inventario, del Explorador y de los diálogos, y sobre carpetas
 temporales de verdad (escanear, duplicados, mapa, papelera, exportar); la lectura del registro
 (`UninstallRegistry`), el escáner de disco, el mapa de rectángulos, las órdenes de desinstalar, la
 papelera, las carpetas protegidas, la comprobación de versión (HTTP simulado) y las traducciones.
+Desde el 2026-11-24 también **las páginas de verdad**: el proyecto de pruebas compila con MAUI los
+XAML de las cuatro páginas, el Shell y la App, las crea con los dobles y pulsa sus controles
+(botones, buscador, interruptores, desplegables y los diálogos, que se contestan pulsando su botón);
+además el arranque (`MauiProgram`) y el lanzador de un solo exe (desempaquetar sin dejarlo a medias).
 Queda sin probar lo que solo existe en el dispositivo: el código de Windows (registro, PackageManager,
-Explorador, bandeja, barra de tareas) y de Android (PackageManager), el arranque, el lanzador y el
-volcado de las páginas en sus controles. El plan para llegar al 90 % está en el fichero de tareas.
-
+Explorador, bandeja, barra de tareas, menús de WinUI y lo que va dentro de `#if WINDOWS` en las
+páginas) y de Android (PackageManager). El plan para llegar al 90 % está en el fichero de tareas.
 ```powershell
 dotnet test Uninstaller.Tests
 pwsh Uninstaller.Tests/cobertura.ps1   # pruebas + las dos coberturas + tiempo

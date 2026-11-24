@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 
@@ -16,13 +16,16 @@ internal static class Program
         try
         {
             var assembly = Assembly.GetExecutingAssembly();
-            var version = Read(assembly, "version.txt").Trim();
+            var version = Read(assembly.GetManifestResourceStream("version.txt"), "version.txt").Trim();
             var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "sOCUninstaller", "app");
             var target = Path.Combine(root, version);
             var exe = Path.Combine(target, "Uninstaller.exe");
 
-            if (!File.Exists(exe) || !File.Exists(Path.Combine(target, ".completa")))
-                Unpack(assembly, root, target);
+            if (NeedsUnpack(target))
+            {
+                using var zip = assembly.GetManifestResourceStream("app.zip") ?? throw new InvalidOperationException("Falta app.zip dentro del exe.");
+                Unpack(zip, root, target);
+            }
 
             var info = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = target };
             // Para que la ventana se pueda anclar a la barra de tareas apuntando a ESTE exe.
@@ -39,15 +42,18 @@ internal static class Program
         }
     }
 
+    /// <summary>Hace falta desempaquetar si no esta el exe o si la vez anterior no termino (sin la marca).</summary>
+    internal static bool NeedsUnpack(string target) =>
+        !File.Exists(Path.Combine(target, "Uninstaller.exe")) || !File.Exists(Path.Combine(target, ".completa"));
+
     /// <summary>Desempaqueta a una carpeta temporal y la renombra al final: nunca queda a medias.</summary>
-    private static void Unpack(Assembly assembly, string root, string target)
+    internal static void Unpack(Stream zip, string root, string target)
     {
         Directory.CreateDirectory(root);
         var temp = target + ".nuevo";
         if (Directory.Exists(temp))
             Directory.Delete(temp, recursive: true);
-        using (var zip = assembly.GetManifestResourceStream("app.zip") ?? throw new InvalidOperationException("Falta app.zip dentro del exe."))
-        using (var archive = new ZipArchive(zip, ZipArchiveMode.Read))
+        using (var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true))
             archive.ExtractToDirectory(temp);
         File.WriteAllText(Path.Combine(temp, ".completa"), DateTime.Now.ToString("s"));
         if (Directory.Exists(target))
@@ -63,9 +69,9 @@ internal static class Program
         }
     }
 
-    private static string Read(Assembly assembly, string name)
+    internal static string Read(Stream? resource, string name)
     {
-        using var stream = assembly.GetManifestResourceStream(name) ?? throw new InvalidOperationException("Falta " + name + " dentro del exe.");
+        using var stream = resource ?? throw new InvalidOperationException("Falta " + name + " dentro del exe.");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }

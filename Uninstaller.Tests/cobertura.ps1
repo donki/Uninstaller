@@ -29,7 +29,17 @@ Get-Content "$results/report/Summary.txt" | Select-Object -First 12
 # sin obj/bin, pruebas, constitucion, generados (*.g.cs, *.Designer.cs); no vacias ni comentarios.
 [xml]$cov = Get-Content $xml.FullName
 $covered = @{}
+$sources = @($cov.coverage.sources.source)
 foreach ($class in $cov.coverage.packages.package.classes.class) {
+    # Solo ficheros de este repositorio: los compartidos (..\Shared) tambien se compilan en las
+    # pruebas, pero no son lineas de esta app y no pueden sumar al numerador.
+    # coverlet da las rutas relativas a una de varias raices (<sources>): la que de un fichero real.
+    $file = if ([IO.Path]::IsPathRooted($class.filename)) { $class.filename } else {
+        $sources | ForEach-Object { Join-Path $_ $class.filename } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    }
+    if (-not $file) { continue }
+    $file = [IO.Path]::GetFullPath($file)
+    if (-not $file.StartsWith($repo + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { continue }
     foreach ($line in $class.lines.line) {
         if ([int]$line.hits -gt 0) { $covered["$($class.filename)|$($line.number)"] = 1 }
     }

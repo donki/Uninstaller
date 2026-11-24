@@ -16,6 +16,14 @@
     <RootNamespace>Uninstaller.Tests</RootNamespace>
     <!-- La cuña de Preferences tapa a la de MAUI a proposito. -->
     <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- Con MAUI se compilan tambien los XAML de las paginas, el Shell y la App: las pruebas crean
+         las paginas de verdad (sin plataforma debajo) y pulsan sus controles. -->
+    <UseMaui>true</UseMaui>
+    <SingleProject>false</SingleProject>
+    <OutputType>Library</OutputType>
+    <EnableDefaultMauiItems>false</EnableDefaultMauiItems>
+    <!-- El lanzador (Launcher\Program.cs) ya trae su Main: sin el que genera el SDK de pruebas. -->
+    <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,8 +38,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -61,12 +70,28 @@
     <Compile Include="..\Services\IToastService.cs" Link="App\Services\IToastService.cs" />
     <Compile Include="..\Services\IDialogService.cs" Link="App\Services\IDialogService.cs" />
     <Compile Include="..\Services\IAppEnvironment.cs" Link="App\Services\IAppEnvironment.cs" />
-    <Compile Include="..\Services\IDesktopIntegration.cs" Link="App\Services\IDesktopIntegration.cs" />
     <Compile Include="..\Services\UpdateService.cs" Link="App\Services\UpdateService.cs" />
     <Compile Include="..\Services\UninstallRegistry.cs" Link="App\Services\UninstallRegistry.cs" />
     <Compile Include="..\Services\OperationQueue.cs" Link="App\Services\OperationQueue.cs" />
     <Compile Include="..\Services\FileDeleter.cs" Link="App\Services\FileDeleter.cs" />
     <Compile Include="..\ViewModels\*.cs" Link="App\ViewModels\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IDesktopIntegration.cs" Link="App\Services\IDesktopIntegration.cs" />
+    <Compile Include="..\Services\MauiAppEnvironment.cs" Link="App\Services\MauiAppEnvironment.cs" />
+    <Compile Include="..\Services\PageDialogService.cs" Link="App\Services\PageDialogService.cs" />
+    <Compile Include="..\Helpers\*.cs" Link="App\Helpers\%(Filename)%(Extension)" />
+    <Compile Include="..\Pages\*.xaml.cs" Link="App\Pages\%(Filename)%(Extension)" DependentUpon="%(Filename)" />
+    <MauiXaml Include="..\Pages\*.xaml" Link="App\Pages\%(Filename)%(Extension)" />
+    <Compile Include="..\App.xaml.cs" Link="App\App.xaml.cs" />
+    <MauiXaml Include="..\App.xaml" Link="App.xaml" />
+    <Compile Include="..\AppShell.xaml.cs" Link="App\AppShell.xaml.cs" />
+    <MauiXaml Include="..\AppShell.xaml" Link="App\AppShell.xaml" />
+    <Compile Include="..\MauiProgram.cs" Link="App\MauiProgram.cs" />
+    <Compile Include="..\Launcher\Program.cs" Link="App\Launcher\Program.cs" />
+    <MauiXaml Include="..\Resources\Styles\*.xaml" Link="Resources\Styles\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Shared\ModernDialog.cs" Link="Shared\ModernDialog.cs" />
+    <Compile Include="..\..\Shared\ModernDialogBack.cs" Link="Shared\ModernDialogBack.cs" />
+    <Compile Include="..\..\Shared\CrashGuard.cs" Link="Shared\CrashGuard.cs" />
+    <Compile Include="..\..\Shared\AuthorNotes.cs" Link="Shared\AuthorNotes.cs" />
   </ItemGroup>
 
 </Project>

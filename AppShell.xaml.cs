@@ -1,4 +1,4 @@
-﻿using Uninstaller.Helpers;
+using Uninstaller.Helpers;
 using Uninstaller.Services;
 
 namespace Uninstaller;
@@ -79,22 +79,25 @@ public partial class AppShell : Shell
     {
         HomeLabel.Text = _l["MenuHome"];
         DiskLabel.Text = _l["DiskMenu"];
-        DiskItem.IsVisible = DeviceInfo.Platform == DevicePlatform.WinUI;
+        DiskItem.IsVisible = OperatingSystem.IsWindows();
         SettingsLabel.Text = _l["SettingsTitle"];
         SettingsItem.IsVisible = true;
         AboutLabel.Text = _l["About"];
-        VersionLabel.Text = $"v{Services.MauiAppEnvironment.DisplayVersion}";
+        VersionLabel.Text = $"v{ServiceHelper.GetRequiredService<IAppEnvironment>().VersionString}";
 
         // Los titulos de las rutas del Shell tambien se localizan (constitucion 8).
+        // La ruta esta en el ShellContent de dentro, no en el FlyoutItem (que la tiene generada):
+        // mirando solo la del FlyoutItem los titulos se quedaban siempre en español.
         foreach (var item in Items)
         {
-            if (item.Route?.Contains("MainPage") == true)
+            var route = item.Items.FirstOrDefault()?.Items.FirstOrDefault()?.Route ?? item.Route;
+            if (route?.Contains("MainPage") == true)
                 item.Title = _l["MenuHome"];
-            else if (item.Route?.Contains("DiskUsagePage") == true)
+            else if (route?.Contains("DiskUsagePage") == true)
                 item.Title = _l["DiskMenu"];
-            else if (item.Route?.Contains("SettingsPage") == true)
+            else if (route?.Contains("SettingsPage") == true)
                 item.Title = _l["SettingsTitle"];
-            else if (item.Route?.Contains("AboutPage") == true)
+            else if (route?.Contains("AboutPage") == true)
                 item.Title = _l["About"];
         }
     }

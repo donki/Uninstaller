@@ -2,6 +2,21 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
+## Sin publicar
+
+- **Pruebas de las páginas** (General §8.6): el proyecto de pruebas compila con MAUI los XAML de
+  la lista de aplicaciones, el espacio en disco, Ajustes, Acerca de, el Shell y la App, y las
+  pruebas los crean y pulsan sus controles como el usuario (también contestan los diálogos). Más
+  pruebas del arranque y del lanzador. **330 pruebas** (antes 287); cobertura sobre toda la app del
+  **47,5 al 54,9 %**. El script de cobertura ya no suma las líneas de `Mobile\Shared`, que ahora
+  también se compilan en las pruebas.
+- **Corregido**: los títulos de las secciones del Shell no se traducían (se quedaban en español
+  también con la aplicación en inglés): se buscaba la ruta en el `FlyoutItem`, y la tiene el
+  `ShellContent` de dentro. Lo encontró una prueba nueva.
+- Sin cambio visible: las páginas preguntan si están en Windows con `OperatingSystem.IsWindows()`
+  y el espacio en disco vuelve al hilo de la interfaz con el `Dispatcher` de la página (antes
+  `DeviceInfo` y `MainThread`, que fuera del dispositivo no existen); el número de versión del
+  menú sale del servicio de entorno; el lanzador desempaqueta desde un flujo (se puede probar).
 ## 2026.10.29.02 — Espacio en disco: botón derecho, ramas y filas planas
 
 `versionCode`: 2026102902 · Windows `2026.10.29.2` (MSIX `2026.10.2902.0`)

@@ -116,7 +116,7 @@ public partial class DiskUsagePage : ContentPage, IDiskView
 
     // ============ IDiskView ============
 
-    public void RunOnUi(Action action) => MainThread.BeginInvokeOnMainThread(action);
+    public void RunOnUi(Action action) => Dispatcher.Dispatch(action);
 
     public IProgress<T> CreateProgress<T>(Action<T> handler) => new Progress<T>(handler);
 
