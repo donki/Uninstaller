@@ -198,6 +198,19 @@ public sealed class DiskUsagePageTests : PageHost
     }
 
     [Fact]
+    public async Task Copiar_sin_portapapeles_se_explica_y_cargar_sin_ruta_no_escanea()
+    {
+        typeof(VisualElement).GetMethod("SendLoaded", BindingFlags.Instance | BindingFlags.NonPublic, Type.EmptyTypes)!.Invoke(_page, null);
+        Assert.Null(Vm.Root);                                    // sin ruta pendiente: espera al usuario
+
+        await ScanAsync();
+        Named<CollectionView>(_page, "TreeList").SelectedItem = Vm.Root!.Children[0];
+        // Sin plataforma no hay portapapeles: el fallo se explica en vez de cerrar la app.
+        Click(_page, "CopyButton");
+        Assert.False(string.IsNullOrEmpty(await AnswerDialog(_page, L("Ok"))));
+    }
+
+    [Fact]
     public async Task Duplicados_tocar_una_fila_la_marca()
     {
         await ScanAsync();

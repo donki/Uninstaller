@@ -54,26 +54,33 @@ en secuencia. Cumple la Constitución de Proyectos de Software de Socratic.
 
 ## Pruebas
 
-**330 pruebas** (xUnit), todas pasan · cobertura del código probado **87,4 %** de líneas · sobre
-toda la app **54,9 %** (2 918 de 5 312 líneas) · el banco tarda **~5 s** (≈ 10 s con el arranque de
-`dotnet test` y la cobertura). Medido el 2026-11-24 (el 2026-10-01: 267 pruebas, 50,8 % de 4 180
-líneas; antes de esta tanda, con el código de octubre, 47,5 % de 5 307).
+**390 pruebas** (xUnit) en dos bancos, todas pasan · cobertura del código instrumentado **85,7 %**
+de líneas · sobre toda la app **90,3 %** (3 814 de 4 224 líneas ejecutables) · los dos bancos tardan
+**~9 s** (≈ 18 s con el arranque de `dotnet test` y la cobertura). Medido el 2026-11-25. Desde ese
+día la cifra de toda la app cuenta **solo código ejecutable** (constitución General §8.6): fuera XAML,
+interfaces y declaraciones; con la medida de antes, el 2026-11-24 daba 54,9 %.
 
-Se prueba la lógica de las cuatro pantallas (`ViewModels/`: lista de aplicaciones, espacio en disco,
-Ajustes, Acerca de) con dobles del inventario, del Explorador y de los diálogos, y sobre carpetas
-temporales de verdad (escanear, duplicados, mapa, papelera, exportar); la lectura del registro
-(`UninstallRegistry`), el escáner de disco, el mapa de rectángulos, las órdenes de desinstalar, la
-papelera, las carpetas protegidas, la comprobación de versión (HTTP simulado) y las traducciones.
-Desde el 2026-11-24 también **las páginas de verdad**: el proyecto de pruebas compila con MAUI los
-XAML de las cuatro páginas, el Shell y la App, las crea con los dobles y pulsa sus controles
-(botones, buscador, interruptores, desplegables y los diálogos, que se contestan pulsando su botón);
-además el arranque (`MauiProgram`) y el lanzador de un solo exe (desempaquetar sin dejarlo a medias).
-Queda sin probar lo que solo existe en el dispositivo: el código de Windows (registro, PackageManager,
-Explorador, bandeja, barra de tareas, menús de WinUI y lo que va dentro de `#if WINDOWS` en las
-páginas) y de Android (PackageManager). El plan para llegar al 90 % está en el fichero de tareas.
+- **`Uninstaller.Tests`** (`net10.0`, 355 pruebas): la lógica de las cuatro pantallas
+  (`ViewModels/`) con dobles del inventario, del Explorador y de los diálogos, sobre carpetas
+  temporales de verdad (escanear, duplicados, mapa, papelera, exportar); el registro, el escáner, el
+  mapa de rectángulos, las órdenes de desinstalar, la papelera, las carpetas protegidas, la versión
+  nueva (HTTP simulado), las traducciones y la lógica de Android sacada a `AndroidPackages`. Además
+  **las páginas de verdad**: compila con MAUI los XAML de las páginas, el Shell y la App, las crea y
+  pulsa sus controles (también contesta los diálogos); el arranque y el lanzador de un solo exe.
+- **`Uninstaller.WindowsTests`** (`net10.0-windows`, 35 pruebas): el código de `Platforms/Windows`
+  sobre el sistema de verdad: la papelera (manda ficheros de la prueba y los saca), iconos y nombres
+  del Explorador, «Abrir con» y el menú del Explorador (se cierra solo), el inventario sobre una clave
+  `Uninstall` propia de la prueba, los paquetes del sistema (solo leídos), «Arrancar con Windows» en
+  una clave `Run` propia, la barra de tareas, la bandeja y los menús de WinUI (pulsando cada entrada).
+  Lo que tocaría fuera (Explorador, UAC, carpeta de iconos) va por costuras que las pruebas cambian.
+
+Queda sin medir lo que solo corre en el dispositivo: el puente de Android con el PackageManager y la
+actividad, y en Windows lo que abre ventanas o pasa al primer plano (restaurar desde la bandeja, el
+menú de la bandeja, el diálogo «Elegir otra aplicación»).
 ```powershell
 dotnet test Uninstaller.Tests
-pwsh Uninstaller.Tests/cobertura.ps1   # pruebas + las dos coberturas + tiempo
+dotnet test Uninstaller.WindowsTests
+pwsh Uninstaller.Tests/cobertura.ps1   # los dos bancos + las dos coberturas + tiempo
 ```
 
 ## Permisos (constitución 6, A.3)

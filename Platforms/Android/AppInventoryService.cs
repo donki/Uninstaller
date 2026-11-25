@@ -12,16 +12,15 @@ namespace Uninstaller.Platforms.Android;
 
 /// <inheritdoc cref="IAppInventoryService"/>
 /// <remarks>
-/// Toda la logica de plataforma (PackageManager, intents de desinstalacion) vive aqui
-/// (constitucion 5). Android NO permite el borrado masivo silencioso: cada desinstalacion la
-/// confirma el usuario en un dialogo del sistema, que se lanza por cada app en secuencia.
+/// Solo el puente con el PackageManager y el intent de desinstalar (constitucion 5): que paquetes
+/// entran, sus fechas y tamaños y la espera del dialogo estan en <see cref="AndroidPackages"/> y
+/// <see cref="UninstallWaiter"/>, con pruebas. Android NO permite el borrado masivo silencioso:
+/// cada desinstalacion la confirma el usuario en un dialogo del sistema, en secuencia.
 /// </remarks>
 public class AppInventoryService : IAppInventoryService
 {
-    private const int UninstallRequestCode = 4711;
-
-    // Espera activa de la desinstalacion en curso; la resuelve MainActivity.OnActivityResult.
-    private static TaskCompletionSource<bool>? _pendingUninstall;
+    // La resuelve MainActivity.OnActivityResult.
+    private static readonly UninstallWaiter Waiter = new();
 
     public Task<IReadOnlyList<InstalledApp>> GetInstalledAppsAsync(bool includeSystem)
     {
@@ -29,127 +28,41 @@ public class AppInventoryService : IAppInventoryService
         return Task.Run<IReadOnlyList<InstalledApp>>(() =>
         {
             var context = AndroidApp.Context;
-            var pm = context.PackageManager
-                     ?? throw new InvalidOperationException("PackageManager is not available.");
-            var ownPackage = context.PackageName;
-
-            var result = new List<InstalledApp>();
-
+            var pm = context.PackageManager ?? throw new InvalidOperationException("PackageManager is not available.");
             // GetInstalledPackages (no GetInstalledApplications) para tener FirstInstallTime/LastUpdateTime.
-            foreach (var pi in pm.GetInstalledPackages(PackageInfoFlags.MetaData))
-            {
-                var ai = pi.ApplicationInfo;
-                if (ai is null)
-                    continue;
-
-                var package = pi.PackageName ?? ai.PackageName;
-                if (string.IsNullOrEmpty(package) || package == ownPackage)
-                    continue;
-
-                // Una app del sistema actualizada por el usuario se trata como de usuario.
-                var isSystem = (ai.Flags & ApplicationInfoFlags.System) != 0
-                               && (ai.Flags & ApplicationInfoFlags.UpdatedSystemApp) == 0;
-                if (!includeSystem && isSystem)
-                    continue;
-
-                string label;
-                try { label = pm.GetApplicationLabel(ai)?.ToString() ?? package; }
-                catch { label = package; }
-
-                ImageSource? icon = null;
-                try { icon = ToImageSource(pm.GetApplicationIcon(ai)); }
-                catch { /* algunas apps no exponen icono: se muestra sin el */ }
-
-                result.Add(new InstalledApp
-                {
-                    PackageName = package,
-                    Label = label,
-                    IsSystem = isSystem,
-                    InstallDate = FromMillis(pi.FirstInstallTime),
-                    UpdatedDate = FromMillis(pi.LastUpdateTime),
-                    SizeBytes = GetApkSize(ai),
-                    Icon = icon
-                });
-            }
-
-            // Orden por defecto: fecha de instalacion (mas reciente primero). La UI puede reordenar.
-            result.Sort((a, b) => b.InstallDate.CompareTo(a.InstallDate));
-            return result;
+            var packages = pm.GetInstalledPackages(PackageInfoFlags.MetaData)
+                .Where(pi => pi.ApplicationInfo is not null)
+                .Select(pi => ToPackage(pm, pi, pi.ApplicationInfo!));
+            return AndroidPackages.Build(packages, context.PackageName, includeSystem);
         });
     }
+
+    private static AndroidPackage ToPackage(PackageManager pm, PackageInfo pi, ApplicationInfo ai) => new(
+        pi.PackageName ?? ai.PackageName,
+        (ai.Flags & ApplicationInfoFlags.System) != 0,
+        (ai.Flags & ApplicationInfoFlags.UpdatedSystemApp) != 0,
+        pi.FirstInstallTime,
+        pi.LastUpdateTime,
+        ai.PublicSourceDir ?? ai.SourceDir,
+        ai.SplitPublicSourceDirs ?? ai.SplitSourceDirs,
+        () => pm.GetApplicationLabel(ai)?.ToString(),
+        () => ToImageSource(pm.GetApplicationIcon(ai)));
 
     public Task<bool> UninstallAsync(string packageName, bool unattended)
     {
         var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
         if (activity is null)
             return Task.FromResult(false);
-
-        // Si quedo una espera anterior sin resolver, se cierra para no bloquear.
-        _pendingUninstall?.TrySetResult(false);
-
-        var tcs = new TaskCompletionSource<bool>();
-        _pendingUninstall = tcs;
-
+        var task = Waiter.Start();
         var intent = new Intent(Intent.ActionUninstallPackage);
         intent.SetData(Uri.Parse("package:" + packageName));
         intent.PutExtra(Intent.ExtraReturnResult, true);
-        activity.StartActivityForResult(intent, UninstallRequestCode);
-
-        return tcs.Task;
+        activity.StartActivityForResult(intent, UninstallWaiter.RequestCode);
+        return task;
     }
 
     /// <summary>Puente desde MainActivity.OnActivityResult: resuelve la desinstalacion en curso.</summary>
-    public static void OnUninstallResult(int requestCode, Result resultCode)
-    {
-        if (requestCode != UninstallRequestCode)
-            return;
-
-        var tcs = _pendingUninstall;
-        _pendingUninstall = null;
-        // Con EXTRA_RETURN_RESULT, RESULT_OK significa desinstalada.
-        tcs?.TrySetResult(resultCode == Result.Ok);
-    }
-
-    /// <summary>
-    /// Tamano de los APK instalados: el base mas los splits que genera un App Bundle. Es el dato
-    /// que se puede leer sin permisos; el tamano total con datos y cache exigiria
-    /// PACKAGE_USAGE_STATS, un permiso que el usuario tendria que conceder a mano y que esta app
-    /// no necesita para nada mas (constitucion 3: solo los permisos imprescindibles).
-    /// </summary>
-    private static long GetApkSize(ApplicationInfo ai)
-    {
-        long total = 0;
-        try
-        {
-            var baseApk = ai.PublicSourceDir ?? ai.SourceDir;
-            if (!string.IsNullOrEmpty(baseApk) && File.Exists(baseApk))
-                total += new FileInfo(baseApk).Length;
-
-            var splits = ai.SplitPublicSourceDirs ?? ai.SplitSourceDirs;
-            if (splits is not null)
-            {
-                foreach (var split in splits)
-                {
-                    if (!string.IsNullOrEmpty(split) && File.Exists(split))
-                        total += new FileInfo(split).Length;
-                }
-            }
-        }
-        catch
-        {
-            // Alguna app del sistema no deja leer su APK: se muestra sin tamano en vez de fallar.
-        }
-
-        return total;
-    }
-
-    private static DateTime FromMillis(long millis)
-    {
-        if (millis <= 0)
-            return DateTime.MinValue;
-        try { return DateTimeOffset.FromUnixTimeMilliseconds(millis).LocalDateTime; }
-        catch { return DateTime.MinValue; }
-    }
+    public static void OnUninstallResult(int requestCode, Result resultCode) => Waiter.Complete(requestCode, resultCode == Result.Ok);
 
     private static ImageSource? ToImageSource(Drawable? drawable)
     {

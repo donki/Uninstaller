@@ -38,6 +38,18 @@ public sealed class ShellAndStartupTests : PageHost
         Assert.False(shell.FlyoutIsPresented);
     }
 
+    [Theory]
+    [InlineData("OnHomeTapped")]
+    [InlineData("OnDiskTapped")]
+    [InlineData("OnSettingsTapped")]
+    [InlineData("OnAboutTapped")]
+    public void Shell_cada_entrada_del_menu_cierra_el_menu_y_navega(string handler)
+    {
+        var shell = new AppShell { FlyoutIsPresented = true };
+        Invoke(shell, handler, shell, new TappedEventArgs(null));
+        Assert.False(shell.FlyoutIsPresented);
+    }
+
     [Fact]
     public void Shell_con_ruta_de_disco_pendiente_va_al_disco_al_cargar()
     {

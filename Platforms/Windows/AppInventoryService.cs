@@ -36,6 +36,19 @@ public class AppInventoryService : IAppInventoryService
         public bool SupportsUnattended => UninstallCommands.SupportsUnattended(QuietUninstallString, Installer);
     }
 
+    // De donde se lee: las claves Uninstall del sistema y los paquetes del usuario. Las pruebas dan
+    // una clave suya del registro y una lista de paquetes acotada.
+    private readonly (RegistryKey Hive, string Path)[] _uninstallKeys;
+    private readonly Func<IEnumerable<global::Windows.ApplicationModel.Package>> _packages;
+
+    public AppInventoryService() : this(UninstallKeys, () => new PackageManager().FindPackagesForUser(string.Empty)) { }
+
+    internal AppInventoryService((RegistryKey Hive, string Path)[] uninstallKeys, Func<IEnumerable<global::Windows.ApplicationModel.Package>> packages)
+    {
+        _uninstallKeys = uninstallKeys;
+        _packages = packages;
+    }
+
     public Task<IReadOnlyList<InstalledApp>> GetInstalledAppsAsync(bool includeSystem)
     {
         return Task.Run<IReadOnlyList<InstalledApp>>(() =>
@@ -44,7 +57,7 @@ public class AppInventoryService : IAppInventoryService
             _win32.Clear();
             var folders = new Dictionary<InstalledApp, string>();
             ReadRegistry(includeSystem, result, folders);
-            ReadPackages(includeSystem, result, folders);
+            ReadPackages(_packages(), includeSystem, result, folders);
             MeasureFolders(folders);
             result.Sort((a, b) => b.InstallDate.CompareTo(a.InstallDate));
             return result;
@@ -74,7 +87,7 @@ public class AppInventoryService : IAppInventoryService
     private void ReadRegistry(bool includeSystem, List<InstalledApp> result, Dictionary<InstalledApp, string> folders)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (hive, path) in UninstallKeys)
+        foreach (var (hive, path) in _uninstallKeys)
         {
             using var root = hive.OpenSubKey(path);
             if (root is null)
@@ -153,6 +166,9 @@ public class AppInventoryService : IAppInventoryService
     /// desinstalado cuando su clave del registro ha desaparecido; algunos desinstaladores lanzan
     /// otro proceso y se cierran enseguida, asi que despues se le da un margen.
     /// </summary>
+    /// <summary>Cada cuanto se mira si la clave ya no esta (20 veces); las pruebas lo acortan.</summary>
+    internal static TimeSpan UninstallPoll { get; set; } = TimeSpan.FromSeconds(1);
+
     private static async Task<bool> RunUninstallerAsync(Win32Entry entry, bool unattended)
     {
         var (file, arguments) = UninstallCommand(entry, unattended);
@@ -173,7 +189,7 @@ public class AppInventoryService : IAppInventoryService
         {
             if (!KeyExists(entry))
                 return true;
-            await Task.Delay(1000);
+            await Task.Delay(UninstallPoll);
         }
         return !KeyExists(entry);
     }
@@ -192,18 +208,14 @@ public class AppInventoryService : IAppInventoryService
         return key is not null;
     }
 
-    /// <summary>«"C:\x\unins.exe" /arg» → (C:\x\unins.exe, /arg); sin comillas se corta tras el .exe.</summary>
-    private static (string File, string Arguments) SplitCommand(string command) => UninstallCommands.Split(command);
-
     // ------------------------------------------------------------------ MSIX (PackageManager)
 
     private static void MeasureFolders(Dictionary<InstalledApp, string> folders) => UninstallRegistry.MeasureFolders(folders);
 
-    private static void ReadPackages(bool includeSystem, List<InstalledApp> result, Dictionary<InstalledApp, string> folders)
+    private static void ReadPackages(IEnumerable<global::Windows.ApplicationModel.Package> packages, bool includeSystem, List<InstalledApp> result, Dictionary<InstalledApp, string> folders)
     {
-        var manager = new PackageManager();
         var own = OwnPackageFamily();
-        foreach (var package in manager.FindPackagesForUser(string.Empty))
+        foreach (var package in packages)
         {
             try
             {

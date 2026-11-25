@@ -11,13 +11,24 @@ namespace Uninstaller.Launcher;
 /// </summary>
 internal static class Program
 {
-    private static int Main(string[] args)
+    private static int Main(string[] args) => Run(
+        args,
+        Assembly.GetExecutingAssembly(),
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        info => Process.Start(info),
+        message => MessageBox(IntPtr.Zero, message, "sOC Uninstaller", 0x10));
+
+    /// <summary>
+    /// Desempaqueta (si hace falta) la version que lleva <paramref name="assembly"/> dentro de
+    /// <paramref name="localAppData"/> y arranca la aplicacion con los mismos argumentos. Si algo
+    /// falla, lo dice con <paramref name="error"/> y devuelve 1.
+    /// </summary>
+    internal static int Run(string[] args, Assembly assembly, string localAppData, Action<ProcessStartInfo> start, Action<string> error)
     {
         try
         {
-            var assembly = Assembly.GetExecutingAssembly();
             var version = Read(assembly.GetManifestResourceStream("version.txt"), "version.txt").Trim();
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "sOCUninstaller", "app");
+            var root = Path.Combine(localAppData, "sOCUninstaller", "app");
             var target = Path.Combine(root, version);
             var exe = Path.Combine(target, "Uninstaller.exe");
 
@@ -32,12 +43,12 @@ internal static class Program
             info.Environment["SOC_LAUNCHER"] = Environment.ProcessPath ?? string.Empty;
             foreach (var a in args)
                 info.ArgumentList.Add(a);
-            Process.Start(info);
+            start(info);
             return 0;
         }
         catch (Exception ex)
         {
-            MessageBox(IntPtr.Zero, "No se ha podido arrancar sOC Uninstaller:\n" + ex.Message, "sOC Uninstaller", 0x10);
+            error("No se ha podido arrancar sOC Uninstaller:\n" + ex.Message);
             return 1;
         }
     }

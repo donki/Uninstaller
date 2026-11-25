@@ -17,9 +17,11 @@ namespace Uninstaller.Services;
 /// </remarks>
 public static class DiskScanner
 {
+    // Sin IgnoreInaccessible: cada carpeta se lista por separado (no recursivo), y con el puesto una
+    // carpeta sin permiso salia vacia, 0 bytes y sin marcar, en vez de inaccesible.
     private static readonly EnumerationOptions Options = new()
     {
-        IgnoreInaccessible = true,
+        IgnoreInaccessible = false,
         RecurseSubdirectories = false,
         AttributesToSkip = 0,
         ReturnSpecialDirectories = false,

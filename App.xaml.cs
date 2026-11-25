@@ -4,9 +4,6 @@ public partial class App : Application
 {
 #if WINDOWS
     private Platforms.Windows.TrayIcon? _tray;
-
-    /// <summary>El icono de bandeja, para que Ajustes le cambie el comportamiento al vuelo.</summary>
-    public static Platforms.Windows.TrayIcon? Tray { get; private set; }
 #endif
 
     public App()
@@ -48,7 +45,7 @@ public partial class App : Application
                 var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(native);
                 var settings = Helpers.ServiceHelper.GetRequiredService<Services.ISettingsService>();
                 _tray = new Platforms.Windows.TrayIcon(hwnd, key => loc[key], () => native.Close()) { MinimizeToTray = settings.TrayOnMinimize };
-                Tray = _tray;
+                Platforms.Windows.TrayIcon.Current = _tray;
                 // «--tray» (arranque con Windows): escondida en la bandeja desde el principio.
                 if (Environment.GetCommandLineArgs().Contains("--tray"))
                     native.DispatcherQueue.TryEnqueue(() => _tray.HideToTray());

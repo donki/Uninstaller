@@ -9,7 +9,8 @@ namespace Uninstaller.Platforms.Windows;
 /// </summary>
 internal static class WindowsStartup
 {
-    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    /// <summary>La clave Run del usuario; las pruebas usan una suya para no tocar el arranque de verdad.</summary>
+    internal static string RunKey { get; set; } = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     /// <summary>El exe que hay que arrancar: el lanzador que abrio la aplicacion, o el propio exe.</summary>
     public static string ExecutablePath =>

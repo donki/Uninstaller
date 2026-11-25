@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pruebas del codigo de Windows de sOC Uninstaller (Platforms\Windows): la papelera de verdad,
+    iconos y nombres del sistema, «Abrir con», el inventario del registro y de paquetes, «Arrancar con
+    Windows» y la identidad para la barra de tareas. Se compila para net10.0-windows con el simbolo
+    WINDOWS, enlazando los ficheros de la app. Lo que tocaria fuera (procesos, UAC, la clave Run, las
+    claves Uninstall del sistema, la carpeta de iconos) va por costuras que las pruebas cambian.
+    Uso: dotnet test Uninstaller.WindowsTests
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Uninstaller.WindowsTests</RootNamespace>
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+    <!-- La version que enseña MauiAppEnvironment en Windows sale de aqui. -->
+    <InformationalVersion>2026.11.25.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- Los tipos de MAUI (ImageSource) arrancan WinUI: sin empaquetar, con el runtime de Windows App
+         SDK del sistema, que se carga solo al abrir el ensamblado de pruebas. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <WindowsAppSdkBootstrapInitialize>true</WindowsAppSdkBootstrapInitialize>
+    <!-- CA1416: el minimo de la app es 17763 y alguna API es de 19041, igual que en la app. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xunit (Apache-2.0), su runner (Apache-2.0), Microsoft.NET.Test.Sdk (MIT) y coverlet (MIT): solo para probar, no se distribuyen. -->
+    <PackageReference Include="coverlet.collector" Version="10.1.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Maui.Controls.Core" Version="10.0.20" />
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.20" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Microsoft.Maui.Controls" />
+    <Using Include="Microsoft.Maui.Graphics" />
+    <Using Include="Microsoft.Maui" />
+    <Using Include="Microsoft.Maui.ApplicationModel" />
+    <Using Include="Microsoft.Maui.ApplicationModel.Communication" />
+  </ItemGroup>
+
+  <!-- Codigo de la app que se prueba (enlazado, no copiado). -->
+  <ItemGroup>
+    <Compile Include="..\Platforms\Windows\ShellActions.cs" Link="App\Windows\ShellActions.cs" />
+    <Compile Include="..\Platforms\Windows\ShellOpen.cs" Link="App\Windows\ShellOpen.cs" />
+    <Compile Include="..\Platforms\Windows\AppInventoryService.cs" Link="App\Windows\AppInventoryService.cs" />
+    <Compile Include="..\Platforms\Windows\WindowsStartup.cs" Link="App\Windows\WindowsStartup.cs" />
+    <Compile Include="..\Platforms\Windows\TaskbarIdentity.cs" Link="App\Windows\TaskbarIdentity.cs" />
+    <Compile Include="..\Platforms\Windows\SocMenu.cs" Link="App\Windows\SocMenu.cs" />
+    <Compile Include="..\Platforms\Windows\TrayIcon.cs" Link="App\Windows\TrayIcon.cs" />
+    <Compile Include="..\Platforms\Windows\DiskMenus.cs" Link="App\Windows\DiskMenus.cs" />
+    <Compile Include="..\Models\FolderNode.cs" Link="App\Models\FolderNode.cs" />
+    <Compile Include="..\Services\IDesktopIntegration.cs" Link="App\Services\IDesktopIntegration.cs" />
+    <Compile Include="..\Services\IAppEnvironment.cs" Link="App\Services\IAppEnvironment.cs" />
+    <Compile Include="..\Services\MauiAppEnvironment.cs" Link="App\Services\MauiAppEnvironment.cs" />
+    <Compile Include="..\Services\IShellActions.cs" Link="App\Services\IShellActions.cs" />
+    <Compile Include="..\Services\IAppInventoryService.cs" Link="App\Services\IAppInventoryService.cs" />
+    <Compile Include="..\Services\RecycleBinPaths.cs" Link="App\Services\RecycleBinPaths.cs" />
+    <Compile Include="..\Services\ProtectedFolders.cs" Link="App\Services\ProtectedFolders.cs" />
+    <Compile Include="..\Services\FileDeleter.cs" Link="App\Services\FileDeleter.cs" />
+    <Compile Include="..\Services\UninstallRegistry.cs" Link="App\Services\UninstallRegistry.cs" />
+    <Compile Include="..\Services\UninstallCommands.cs" Link="App\Services\UninstallCommands.cs" />
+    <Compile Include="..\Models\InstalledApp.cs" Link="App\Models\InstalledApp.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,62 +1,44 @@
 # Pruebas con cobertura (constitucion General 8.6). Uso, desde cualquier carpeta:
 #   pwsh Uninstaller.Tests/cobertura.ps1
-# Compila, pasa las pruebas con coverlet, resume con ReportGenerator (dotnet tool local del repo)
-# y da las dos cifras: cobertura de lo instrumentado y cobertura sobre toda la app.
+# Compila y pasa los dos bancos con coverlet: Uninstaller.Tests (net10.0: logica, paginas, Shell,
+# lanzador) y Uninstaller.WindowsTests (net10.0-windows: el codigo de Platforms\Windows). Resume con
+# ReportGenerator (dotnet tool local del repo) y da las dos cifras: cobertura de lo instrumentado y
+# cobertura de toda la app, que cuenta solo codigo ejecutable (General 8.6, 2026-11-25) con el script
+# comun Mobile/Shared/cobertura-app.py; lo que ningun banco compila (Android) entra estimado.
 $ErrorActionPreference = 'Stop'
-$tests = $PSScriptRoot
-$repo = Split-Path $tests
-$results = Join-Path $tests 'TestResults'
-if (Test-Path $results) { Remove-Item $results -Recurse -Force }
-
-dotnet build $tests -m:1 -nodeReuse:false -p:UseSharedCompilation=false -v:q -nologo | Out-Host
-if ($LASTEXITCODE) { exit $LASTEXITCODE }
-
+$repo = Split-Path $PSScriptRoot
+$benches = @(
+    @{ Project = Join-Path $repo 'Uninstaller.Tests'; Defines = '' },
+    @{ Project = Join-Path $repo 'Uninstaller.WindowsTests'; Defines = 'WINDOWS' }
+)
+$code = 0
 $watch = [Diagnostics.Stopwatch]::StartNew()
-dotnet test $tests --no-build -s (Join-Path $tests coverlet.runsettings) --collect:"XPlat Code Coverage" --results-directory $results -nologo | Out-Host
-$code = $LASTEXITCODE
-$watch.Stop()
-"Tiempo del banco de pruebas (dotnet test --no-build): {0:N1} s" -f $watch.Elapsed.TotalSeconds
+foreach ($b in $benches) {
+    $results = Join-Path $b.Project 'TestResults'
+    if (Test-Path $results) { Remove-Item $results -Recurse -Force }
+    dotnet build $b.Project -m:1 -nodeReuse:false -p:UseSharedCompilation=false -v:q -nologo | Out-Host
+    if ($LASTEXITCODE) { exit $LASTEXITCODE }
+}
+$watch.Reset()
+foreach ($b in $benches) {
+    $watch.Start()
+    dotnet test $b.Project --no-build -s (Join-Path $b.Project coverlet.runsettings) --collect:"XPlat Code Coverage" --results-directory (Join-Path $b.Project 'TestResults') -nologo | Out-Host
+    $watch.Stop()
+    if ($LASTEXITCODE) { $code = $LASTEXITCODE }
+    $b.Xml = (Get-ChildItem (Join-Path $b.Project 'TestResults') -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1).FullName
+}
+"Tiempo de los bancos de pruebas (dotnet test --no-build): {0:N1} s" -f $watch.Elapsed.TotalSeconds
 
-$xml = Get-ChildItem $results -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1
+$reports = ($benches | ForEach-Object { $_.Xml }) -join ';'
+$out = Join-Path $PSScriptRoot 'TestResults/report'
 Push-Location $repo
 try {
     dotnet tool restore | Out-Null
-    dotnet reportgenerator "-reports:$($xml.FullName)" "-targetdir:$results/report" -reporttypes:TextSummary | Out-Null
+    dotnet reportgenerator "-reports:$reports" "-targetdir:$out" -reporttypes:TextSummary | Out-Null
 } finally { Pop-Location }
-Get-Content "$results/report/Summary.txt" | Select-Object -First 12
+Get-Content "$out/Summary.txt" | Select-Object -First 12
 
-# Lineas cubiertas (sin repetir fichero+linea) frente a las lineas de codigo C# de toda la app:
-# sin obj/bin, pruebas, constitucion, generados (*.g.cs, *.Designer.cs); no vacias ni comentarios.
-[xml]$cov = Get-Content $xml.FullName
-$covered = @{}
-$sources = @($cov.coverage.sources.source)
-foreach ($class in $cov.coverage.packages.package.classes.class) {
-    # Solo ficheros de este repositorio: los compartidos (..\Shared) tambien se compilan en las
-    # pruebas, pero no son lineas de esta app y no pueden sumar al numerador.
-    # coverlet da las rutas relativas a una de varias raices (<sources>): la que de un fichero real.
-    $file = if ([IO.Path]::IsPathRooted($class.filename)) { $class.filename } else {
-        $sources | ForEach-Object { Join-Path $_ $class.filename } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    }
-    if (-not $file) { continue }
-    $file = [IO.Path]::GetFullPath($file)
-    if (-not $file.StartsWith($repo + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { continue }
-    foreach ($line in $class.lines.line) {
-        if ([int]$line.hits -gt 0) { $covered["$($class.filename)|$($line.number)"] = 1 }
-    }
-}
-$total = 0
-Get-ChildItem $repo -Recurse -Filter *.cs | Where-Object {
-    $_.FullName -notmatch '\\(obj|bin|constitution|[^\\]+\.Tests)\\' -and
-    $_.Name -notmatch '\.(g|Designer)\.cs$'
-} | ForEach-Object {
-    $inBlock = $false
-    foreach ($l in Get-Content $_.FullName) {
-        $t = $l.Trim()
-        if ($inBlock) { if ($t -match '\*/') { $inBlock = $false }; continue }
-        if ($t -eq '' -or $t.StartsWith('//')) { continue }
-        if ($t.StartsWith('/*')) { if ($t -notmatch '\*/') { $inBlock = $true }; continue }
-        $total++
-    }
-}
-"Cobertura sobre toda la app: {0} de {1} lineas = {2:N1} %" -f $covered.Count, $total, (100.0 * $covered.Count / $total)
+$pyArgs = @('--app', $repo)
+foreach ($b in $benches) { $pyArgs += @('--report', $b.Xml, '--defines', $b.Defines) }
+python (Join-Path $repo '..\Shared\cobertura-app.py') @pyArgs
 exit $code

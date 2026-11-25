@@ -34,6 +34,9 @@ public sealed class TrayIcon
 
     private delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+    /// <summary>El icono de la ventana principal, para que Ajustes le cambie el comportamiento al vuelo.</summary>
+    public static TrayIcon? Current { get; set; }
+
     /// <summary>Si al minimizar se esconde en la bandeja (ajuste del usuario) o se minimiza como siempre.</summary>
     public bool MinimizeToTray { get; set; } = true;
 

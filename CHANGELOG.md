@@ -2,21 +2,39 @@
 
 Todas las versiones siguen el esquema de fecha `AAAA.MM.DD.NN` (constitucion 11).
 
-## Sin publicar
+## 2026.11.25.00 — Carpetas sin permiso a la vista y pruebas de toda la app
 
-- **Pruebas de las páginas** (General §8.6): el proyecto de pruebas compila con MAUI los XAML de
-  la lista de aplicaciones, el espacio en disco, Ajustes, Acerca de, el Shell y la App, y las
-  pruebas los crean y pulsan sus controles como el usuario (también contestan los diálogos). Más
-  pruebas del arranque y del lanzador. **330 pruebas** (antes 287); cobertura sobre toda la app del
-  **47,5 al 54,9 %**. El script de cobertura ya no suma las líneas de `Mobile\Shared`, que ahora
-  también se compilan en las pruebas.
-- **Corregido**: los títulos de las secciones del Shell no se traducían (se quedaban en español
-  también con la aplicación en inglés): se buscaba la ruta en el `FlyoutItem`, y la tiene el
-  `ShellContent` de dentro. Lo encontró una prueba nueva.
-- Sin cambio visible: las páginas preguntan si están en Windows con `OperatingSystem.IsWindows()`
-  y el espacio en disco vuelve al hilo de la interfaz con el `Dispatcher` de la página (antes
-  `DeviceInfo` y `MainThread`, que fuera del dispositivo no existen); el número de versión del
-  menú sale del servicio de entorno; el lanzador desempaqueta desde un flujo (se puede probar).
+`versionCode`: 2026112500 · Windows `2026.11.25.0` (MSIX `2026.11.2500.0`)
+
+- **Corregido: en el espacio en disco, una carpeta sin permiso salía vacía** (0 bytes, como si no
+  tuviera nada) en vez de marcada como inaccesible. Así nunca saltaba el aviso de pedir permiso
+  antes de borrarla. El escáner listaba cada carpeta con «ignorar lo inaccesible», que se tragaba el
+  error. Lo encontró una prueba nueva.
+- **Corregido: los títulos de las secciones del menú lateral no se traducían** (se quedaban en
+  español con la aplicación en inglés). Se buscaba la ruta en el `FlyoutItem`, y la tiene el
+  `ShellContent` de dentro. También lo encontró una prueba.
+- **Pruebas de toda la app** (General §8.6): **390 pruebas** (antes 287) y cobertura de toda la app
+  del **90,3 %**, contando solo código ejecutable (la medida de la constitución desde el 2026-11-25;
+  con la de antes eran 47,5 %).
+  - El proyecto de pruebas compila con MAUI los XAML de las páginas, el Shell y la App, y las pruebas
+    pulsan sus controles y contestan sus diálogos.
+  - Banco nuevo `Uninstaller.WindowsTests` para el código de Windows sobre el sistema de verdad:
+    papelera, iconos, «Abrir con», menú del Explorador, inventario, «Arrancar con Windows», barra de
+    tareas, bandeja y menús.
+  - La cifra la da el script común `Mobile/Shared/cobertura-app.py`.
+- Sin cambio visible:
+  - La lógica de Android (qué paquetes salen, fechas, tamaños, la espera del diálogo de desinstalar)
+    y los menús del botón derecho del espacio en disco salen de la plataforma y de la página a
+    clases propias (`AndroidPackages`, `PortableShellActions`, `DiskMenus`).
+  - El código de Windows lleva costuras finas (arranque de procesos, carpeta de iconos, clave `Run`,
+    claves `Uninstall`) para probarlo sin abrir el Explorador ni el control de cuentas.
+  - Las páginas preguntan si están en Windows con `OperatingSystem.IsWindows()`.
+
+### English
+- Fixed: in disk usage, a folder you have no permission to list showed as empty instead of
+  inaccessible. Fixed: the side menu section titles stayed in Spanish.
+- 390 automated tests; 90.3 % of the app's executable code covered.
+
 ## 2026.10.29.02 — Espacio en disco: botón derecho, ramas y filas planas
 
 `versionCode`: 2026102902 · Windows `2026.10.29.2` (MSIX `2026.10.2902.0`)

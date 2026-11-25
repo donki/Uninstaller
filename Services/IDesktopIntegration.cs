@@ -23,7 +23,7 @@ public class DesktopIntegration : IDesktopIntegration
 
     public void SetMinimizeToTray(bool enabled)
     {
-        if (App.Tray is { } tray)
+        if (Platforms.Windows.TrayIcon.Current is { } tray)
             tray.MinimizeToTray = enabled;
     }
 #else

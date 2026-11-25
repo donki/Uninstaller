@@ -16,7 +16,7 @@ public sealed record OpenWithApp(string Name, string? IconFile, Action<string> O
 public static class ShellOpen
 {
     /// <summary>Con el programa predeterminado (una carpeta, en el Explorador).</summary>
-    public static void Open(string path) => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    public static void Open(string path) => ShellActions.StartProcess(new ProcessStartInfo(path) { UseShellExecute = true });
 
     /// <summary>Los programas recomendados para esa extension, como en el «Abrir con» de Windows.</summary>
     public static IReadOnlyList<OpenWithApp> AppsFor(string file)
@@ -169,7 +169,7 @@ public static class ShellOpen
 
     // ------------------------------------------------------------------ iconos de los programas
 
-    private static readonly string IconDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "sOCUninstaller", "icons");
+    internal static string IconDir { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "sOCUninstaller", "icons");
 
     /// <summary>El icono del programa como PNG en disco (para el menu); null si no se puede sacar.</summary>
     private static string? IconFile(string location, int index)

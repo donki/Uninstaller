@@ -11,8 +11,8 @@
     <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- El lanzador de un solo exe (Launcher\) y las pruebas (Uninstaller.Tests\) son otros proyectos: fuera de este. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Launcher\**;Uninstaller.Tests\**</DefaultItemExcludes>
+    <!-- El lanzador de un solo exe (Launcher\) y las pruebas (Uninstaller.Tests\ y Uninstaller.WindowsTests\) son otros proyectos: fuera de este. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Launcher\**;Uninstaller.Tests\**;Uninstaller.WindowsTests\**</DefaultItemExcludes>
 
     <!-- Display name -->
     <ApplicationTitle>Uninstaller</ApplicationTitle>
@@ -21,8 +21,8 @@
     <ApplicationId>com.socratic.uninstaller</ApplicationId>
 
     <!-- Versions (constitucion 11 / A.4: ambos valores en sincronia) -->
-    <ApplicationDisplayVersion>2026.10.29.02</ApplicationDisplayVersion>
-    <ApplicationVersion>2026102902</ApplicationVersion>
+    <ApplicationDisplayVersion>2026.11.25.00</ApplicationDisplayVersion>
+    <ApplicationVersion>2026112500</ApplicationVersion>
 
     <!-- Accept Android SDK Licenses -->
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>

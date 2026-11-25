@@ -9,6 +9,9 @@ namespace Uninstaller.Platforms.Windows;
 /// <inheritdoc cref="IShellActions"/>
 public class ShellActions : IShellActions
 {
+    /// <summary>Arranca procesos (el Explorador, el cmd elevado); las pruebas lo cambian para no abrir nada.</summary>
+    internal static Func<ProcessStartInfo, Process?> StartProcess { get; set; } = Process.Start;
+
     public IReadOnlyList<DriveEntry> GetDrives()
     {
         var list = new List<DriveEntry>();
@@ -35,7 +38,7 @@ public class ShellActions : IShellActions
             ? new ProcessStartInfo("explorer.exe", $"\"{path}\"")
             : new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"");
         info.UseShellExecute = true;
-        Process.Start(info);
+        StartProcess(info);
     }
 
     /// <summary>SHFileOperation con FOF_ALLOWUNDO: a la papelera, como desde el Explorador.</summary>
@@ -203,7 +206,7 @@ public class ShellActions : IShellActions
                 Verb = "runas",                       // UAC
                 WindowStyle = ProcessWindowStyle.Hidden,
             };
-            using var process = Process.Start(info);
+            using var process = StartProcess(info);
             if (process is null)
                 return false;
             await process.WaitForExitAsync();
@@ -259,7 +262,7 @@ public class ShellActions : IShellActions
     // se le da su propio ImageSource de fichero: un mismo ImageSource de flujo compartido entre muchas
     // filas de un CollectionView se pintaba a ratos si y a ratos no.
     private static readonly Dictionary<string, string?> IconFiles = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly string IconDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "sOCUninstaller", "icons");
+    internal static string IconDir { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "sOCUninstaller", "icons");
 
     /// <summary>
     /// SHGetFileInfo por atributos (sin tocar el disco): un icono por extension y uno de carpeta.

@@ -74,6 +74,8 @@
     <Compile Include="..\Services\UninstallRegistry.cs" Link="App\Services\UninstallRegistry.cs" />
     <Compile Include="..\Services\OperationQueue.cs" Link="App\Services\OperationQueue.cs" />
     <Compile Include="..\Services\FileDeleter.cs" Link="App\Services\FileDeleter.cs" />
+    <Compile Include="..\Services\AndroidPackages.cs" Link="App\Services\AndroidPackages.cs" />
+    <Compile Include="..\Services\PortableShellActions.cs" Link="App\Services\PortableShellActions.cs" />
     <Compile Include="..\ViewModels\*.cs" Link="App\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IDesktopIntegration.cs" Link="App\Services\IDesktopIntegration.cs" />
     <Compile Include="..\Services\MauiAppEnvironment.cs" Link="App\Services\MauiAppEnvironment.cs" />
